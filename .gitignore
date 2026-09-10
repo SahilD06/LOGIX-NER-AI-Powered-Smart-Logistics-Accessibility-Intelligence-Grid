@@ -31,14 +31,14 @@ yarn-error.*
 *.pem
 
 # local env files
-<<<<<<< HEAD
-.env*.local
-=======
 .env
 .env*.local
 .env.production
 .env.development
->>>>>>> b975479ddc28a837af2451e176af696b66432c34
+.expo/
+dist/
+expo-env.d.ts
+nativewind-env.d.ts
 
 # typescript
 *.tsbuildinfo

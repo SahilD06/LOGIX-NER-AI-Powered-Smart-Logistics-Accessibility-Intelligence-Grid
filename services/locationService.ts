@@ -94,7 +94,6 @@ export async function requestUserLocation(): Promise<UserLocation> {
         });
       },
       (err) => {
-        console.warn('Geolocation permission/access error:', err.message);
         resolve({
           ...DEFAULT_NER_LOCATION,
           error: err.message,
@@ -102,9 +101,9 @@ export async function requestUserLocation(): Promise<UserLocation> {
         });
       },
       {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 30000,
+        enableHighAccuracy: false,
+        timeout: 5000,
+        maximumAge: 60000,
       }
     );
   });

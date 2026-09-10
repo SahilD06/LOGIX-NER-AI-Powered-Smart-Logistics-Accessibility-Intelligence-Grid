@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
-import { Activity, AlertOctagon, Camera, Radio, Settings } from 'lucide-react-native';
+import { Activity, BarChart3, AlertOctagon, Camera, Radio, Settings } from 'lucide-react-native';
 import { useAppTheme } from '../../context/ThemeContext';
 
 export default function TabLayout() {
@@ -40,6 +40,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="analytics"
+        options={{
+          title: 'Analytics',
+          tabBarIcon: ({ color }) => <BarChart3 size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="alerts"
         options={{
           title: 'Alerts',
@@ -65,12 +72,6 @@ export default function TabLayout() {
         options={{
           title: 'Settings',
           tabBarIcon: ({ color }) => <Settings size={22} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="two"
-        options={{
-          href: null,
         }}
       />
     </Tabs>

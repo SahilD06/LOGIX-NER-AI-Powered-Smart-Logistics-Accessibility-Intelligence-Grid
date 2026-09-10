@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Header } from '../../components/Header';
 import { RiskGauge } from '../../components/RiskGauge';
 import { InteractiveMap } from '../../components/InteractiveMap';
@@ -16,11 +17,12 @@ import { SOSBanner } from '../../components/SOSBanner';
 import { fetchLiveTelemetry, fetchNasaEvents, TelemetryData, NasaEvent } from '../../services/api';
 import { calculateRisk, RiskEvaluation } from '../../services/aiEngine';
 import { CONNECTIVITY_STATUS } from '../../services/mockData';
-import { MapPin, Navigation, ChevronLeft, ChevronRight, Crosshair, RefreshCw } from 'lucide-react-native';
+import { MapPin, Navigation, ChevronLeft, ChevronRight, BarChart3, ArrowRight } from 'lucide-react-native';
 import { useAppTheme } from '../../context/ThemeContext';
 import { requestUserLocation, UserLocation } from '../../services/locationService';
 
 export default function DashboardScreen() {
+  const router = useRouter();
   const { colors, isDark } = useAppTheme();
   const [telemetry, setTelemetry] = useState<TelemetryData | null>(null);
   const [nasaEvents, setNasaEvents] = useState<NasaEvent[]>([]);
@@ -94,7 +96,6 @@ export default function DashboardScreen() {
   };
 
   useEffect(() => {
-    // Automatically request location permission & acquire GPS position on load
     autoTrackLocation();
   }, []);
 
@@ -106,7 +107,7 @@ export default function DashboardScreen() {
   const risk: RiskEvaluation = calculateRisk('NER Regional', telemetry, simulatedDanger);
 
   return (
-    <View style={StyleSheet.flatten([styles.container, { backgroundColor: colors.bg }])}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <Header onRefresh={onRefresh} />
 
       <ScrollView
@@ -117,7 +118,7 @@ export default function DashboardScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.steelBlue} />
         }
       >
-        {/* Quick Location & Status Pill - Live GPS Auto-Tracking */}
+        {/* Quick Location & Status Pill */}
         <View style={[styles.locationBar, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.locationLeft}>
             <TouchableOpacity
@@ -178,7 +179,7 @@ export default function DashboardScreen() {
         {/* AI Susceptibility Gauge */}
         <RiskGauge risk={risk} telemetry={telemetry} loading={loading} />
 
-        {/* Critical Corridors Ticker - Enlarged */}
+        {/* Critical Corridors Ticker */}
         <View style={styles.corridorContainer}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderLeft}>
@@ -190,7 +191,6 @@ export default function DashboardScreen() {
                 style={[styles.scrollNavBtn, { backgroundColor: colors.subPanel, borderColor: colors.border }]}
                 onPress={() => scrollCorridors('left')}
                 activeOpacity={0.6}
-                accessibilityLabel="Scroll highways left"
               >
                 <ChevronLeft size={18} color={colors.textPrimary} />
               </TouchableOpacity>
@@ -198,7 +198,6 @@ export default function DashboardScreen() {
                 style={[styles.scrollNavBtn, { backgroundColor: colors.subPanel, borderColor: colors.border }]}
                 onPress={() => scrollCorridors('right')}
                 activeOpacity={0.6}
-                accessibilityLabel="Scroll highways right"
               >
                 <ChevronRight size={18} color={colors.textPrimary} />
               </TouchableOpacity>
@@ -262,6 +261,59 @@ export default function DashboardScreen() {
             ))}
           </ScrollView>
         </View>
+
+        {/* Geotechnical & ML Analytics Hub Preview Banner */}
+        <TouchableOpacity
+          style={[styles.analyticsBanner, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+          onPress={() => router.push('/(tabs)/analytics' as any)}
+          activeOpacity={0.85}
+        >
+          <View style={styles.analyticsBannerHeader}>
+            <View style={styles.analyticsBannerLeft}>
+              <View style={[styles.analyticsIconWrap, { backgroundColor: colors.subPanel, borderColor: colors.steelBlue }]}>
+                <BarChart3 size={20} color={colors.steelBlue} />
+              </View>
+              <View style={styles.analyticsTextWrap}>
+                <View style={styles.analyticsTagRow}>
+                  <View style={[styles.analyticsTag, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]}>
+                    <Text style={[styles.analyticsTagText, { color: colors.danger }]}>ML RESEARCH LAB</Text>
+                  </View>
+                  <Text style={[styles.analyticsDatasetCount, { color: colors.textMuted }]}>2,548 Training Records</Text>
+                </View>
+                <Text style={[styles.analyticsMainTitle, { color: colors.textPrimary }]}>
+                  Geotechnical Analytics & ML Risk Matrix
+                </Text>
+              </View>
+            </View>
+
+            <View style={[styles.analyticsArrowBtn, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
+              <ArrowRight size={16} color={colors.steelBlue} />
+            </View>
+          </View>
+
+          <Text style={[styles.analyticsSummaryText, { color: colors.textSecondary }]}>
+            Explore the multi-dimensional Tableau charts: Soil Saturation Risk Matrix Heatmap, Precipitation Boxplots, 10-tier Canopy Retention, and What-If Disaster Simulator.
+          </Text>
+
+          <View style={[styles.analyticsQuickStatsRow, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
+            <View style={styles.statMiniItem}>
+              <Text style={[styles.statMiniVal, { color: colors.success }]}>94.2%</Text>
+              <Text style={[styles.statMiniLabel, { color: colors.textMuted }]}>AUC Accuracy</Text>
+            </View>
+            <View style={styles.statMiniItem}>
+              <Text style={[styles.statMiniVal, { color: colors.warning }]}>150 mm</Text>
+              <Text style={[styles.statMiniLabel, { color: colors.textMuted }]}>Trigger Threshold</Text>
+            </View>
+            <View style={styles.statMiniItem}>
+              <Text style={[styles.statMiniVal, { color: colors.danger }]}>&gt;35°</Text>
+              <Text style={[styles.statMiniLabel, { color: colors.textMuted }]}>Failure Slope</Text>
+            </View>
+            <View style={styles.statMiniItem}>
+              <Text style={[styles.statMiniVal, { color: colors.steelBlue }]}>Tableau</Text>
+              <Text style={[styles.statMiniLabel, { color: colors.textMuted }]}>Master Board</Text>
+            </View>
+          </View>
+        </TouchableOpacity>
 
         {/* Interactive Spatial GIS Radar */}
         <InteractiveMap nasaEvents={nasaEvents} />
@@ -353,6 +405,14 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.2,
   },
+  locRefreshBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   telemetryQuickRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -362,12 +422,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   corridorContainer: {
-    marginVertical: 12,
+    marginBottom: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 10,
   },
   sectionHeaderLeft: {
@@ -377,22 +437,19 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+    fontWeight: '800',
   },
   scrollNavControls: {
     flexDirection: 'row',
-    alignItems: 'center',
     gap: 6,
   },
   scrollNavBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1.5,
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    cursor: 'pointer' as any,
   },
   corridorScroll: {
     flexDirection: 'row',
@@ -440,5 +497,94 @@ const styles = StyleSheet.create({
   corridorReason: {
     fontSize: 11,
     lineHeight: 16,
+  },
+  analyticsBanner: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+    gap: 10,
+  },
+  analyticsBannerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  analyticsBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  analyticsIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  analyticsTextWrap: {
+    flex: 1,
+  },
+  analyticsTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  analyticsTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  analyticsTagText: {
+    fontSize: 8,
+    fontWeight: '900',
+  },
+  analyticsDatasetCount: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  analyticsMainTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  analyticsArrowBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  analyticsSummaryText: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  analyticsQuickStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingVertical: 8,
+  },
+  statMiniItem: {
+    alignItems: 'center',
+  },
+  statMiniVal: {
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  statMiniLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    marginTop: 1,
   },
 });

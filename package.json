@@ -36,11 +36,10 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
-    "build": "expo export -p web"
+    "start": "npx --yes serve dist -l 3000",
+    "serve": "npx --yes serve dist -l 3000",
+    "build": "expo export -p web",
+    "dev": "expo start --web"
   },
   "private": true
 }

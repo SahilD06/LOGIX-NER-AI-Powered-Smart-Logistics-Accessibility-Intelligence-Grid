@@ -7,9 +7,12 @@ import {
   TouchableOpacity,
   Platform,
   Share,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { Header } from '../../components/Header';
 import { useAppTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import { MasterTableauView } from '../../components/analytics/MasterTableauView';
 import { RiskMatrixHeatmap } from '../../components/analytics/RiskMatrixHeatmap';
 import { RainfallBoxplotChart } from '../../components/analytics/RainfallBoxplotChart';
@@ -34,18 +37,48 @@ import {
   AlertOctagon,
   Database,
   Award,
+  Lock,
+  ShieldAlert,
+  ShieldCheck,
+  ArrowRight,
+  RefreshCw,
+  Key,
 } from 'lucide-react-native';
 
 type ViewMode = 'master' | 'pipeline' | 'deepdive' | 'simulator' | 'metrics';
 
 export default function AnalyticsScreen() {
   const { colors, isDark } = useAppTheme();
+  const { currentRole, loginAsRole, loginWithCredentials, isLoading } = useAuth();
+
+  const [adminUsername, setAdminUsername] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [viewMode, setViewMode] = useState<ViewMode>('master');
   const [selectedChartTab, setSelectedChartTab] = useState<
     'heatmap' | 'rainfall' | 'vegetation' | 'seismic' | 'slope' | 'soil'
   >('heatmap');
   const [activeRegion, setActiveRegion] = useState<string>('All NER Corridors');
   const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
+
+  const handleAdminLogin = async () => {
+    setAuthError('');
+    setIsSubmitting(true);
+    const res = await loginWithCredentials(adminUsername, adminPassword);
+    setIsSubmitting(false);
+    if (!res.success) {
+      setAuthError(res.message || 'Invalid administrator credentials');
+    }
+  };
+
+  const handleQuickAdminLogin = async () => {
+    setAuthError('');
+    setIsSubmitting(true);
+    await loginAsRole('admin');
+    setIsSubmitting(false);
+  };
 
   const handleExportCSV = () => {
     const csvContent =
@@ -70,6 +103,120 @@ export default function AnalyticsScreen() {
     setTimeout(() => setDownloadSuccess(false), 3000);
   };
 
+  // If user is not logged in as NDRF Administrator, display the Admin Lock & Authorization Gate
+  if (currentRole !== 'admin') {
+    return (
+      <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+        <Header />
+
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.authLockScrollContainer}
+        >
+          {/* Main Shield Lock Card */}
+          <View style={[styles.authLockCard, { backgroundColor: colors.cardBg, borderColor: colors.dangerBorder }]}>
+            <View style={[styles.authLockIconCircle, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]}>
+              <ShieldAlert size={42} color={colors.danger} />
+            </View>
+
+            <Text style={[styles.authLockTitle, { color: colors.textPrimary }]}>
+              NDRF Command Analytics
+            </Text>
+            <Text style={[styles.authLockBadgeText, { color: colors.danger }]}>
+              RESTRICTED TO ADMINISTRATORS ONLY
+            </Text>
+
+            <Text style={[styles.authLockSubtitle, { color: colors.textSecondary }]}>
+              The Empirical Geotechnical Tableau Matrix, 7-Model Machine Learning Leaderboard, Failure Mechanics Diagnostic Plots, and What-If Disaster Simulator are restricted strictly to authorized NDRF Command Administrators.
+            </Text>
+
+            {/* Current Session Banner */}
+            <View style={[styles.currentRoleNotice, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
+              <Text style={[styles.currentRoleNoticeLabel, { color: colors.textMuted }]}>Current Active Role:</Text>
+              <View style={[styles.currentRoleBadge, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+                <Text style={[styles.currentRoleBadgeText, { color: colors.steelBlue }]}>
+                  👤 {currentRole.toUpperCase()} (Restricted Field View)
+                </Text>
+              </View>
+            </View>
+
+            {/* One-Click Quick Admin Switch */}
+            <TouchableOpacity
+              style={[styles.quickAdminBtn, { backgroundColor: colors.steelBlue }]}
+              onPress={handleQuickAdminLogin}
+              disabled={isSubmitting || isLoading}
+              activeOpacity={0.85}
+            >
+              {isSubmitting || isLoading ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <>
+                  <Key size={16} color="#ffffff" />
+                  <Text style={styles.quickAdminBtnText}>⚡ Instant Admin Unlock (admin / admin)</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* Or Credential Form */}
+            <View style={styles.authLockDivider}>
+              <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+              <Text style={[styles.dividerText, { color: colors.textMuted, backgroundColor: colors.cardBg }]}>
+                OR ENTER COMMAND CREDENTIALS
+              </Text>
+              <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+            </View>
+
+            <View style={styles.authLockInputGroup}>
+              <Text style={[styles.authInputLabel, { color: colors.textPrimary }]}>Administrator ID</Text>
+              <TextInput
+                style={[styles.authInputBox, { backgroundColor: colors.subPanel, color: colors.textPrimary, borderColor: colors.border }]}
+                placeholder="Enter admin username (e.g. admin)"
+                placeholderTextColor={colors.textMuted}
+                value={adminUsername}
+                onChangeText={setAdminUsername}
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.authLockInputGroup}>
+              <Text style={[styles.authInputLabel, { color: colors.textPrimary }]}>Authorization Key</Text>
+              <TextInput
+                style={[styles.authInputBox, { backgroundColor: colors.subPanel, color: colors.textPrimary, borderColor: colors.border }]}
+                placeholder="Enter admin password (e.g. admin)"
+                placeholderTextColor={colors.textMuted}
+                value={adminPassword}
+                onChangeText={setAdminPassword}
+                secureTextEntry
+              />
+            </View>
+
+            {authError ? (
+              <Text style={[styles.authErrorText, { color: colors.danger }]}>
+                ⚠️ {authError}
+              </Text>
+            ) : null}
+
+            <TouchableOpacity
+              style={[styles.authSubmitBtn, { backgroundColor: colors.danger }]}
+              onPress={handleAdminLogin}
+              disabled={isSubmitting || isLoading}
+              activeOpacity={0.85}
+            >
+              {isSubmitting || isLoading ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <>
+                  <Text style={styles.authSubmitBtnText}>Authenticate & Access Analytics</Text>
+                  <ArrowRight size={16} color="#ffffff" />
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <Header />
@@ -87,7 +234,7 @@ export default function AnalyticsScreen() {
             <View style={styles.heroTextCol}>
               <View style={styles.heroBadgeRow}>
                 <View style={[styles.liveDataBadge, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]}>
-                  <Text style={[styles.liveDataBadgeText, { color: colors.danger }]}>ML MODEL v2.4 RESEARCH</Text>
+                  <Text style={[styles.liveDataBadgeText, { color: colors.danger }]}>🛡️ NDRF ADMIN COMMAND ACCESS ACTIVE</Text>
                 </View>
                 <Text style={[styles.recordsCountText, { color: colors.textMuted }]}>
                   2,548 Training Records
@@ -627,6 +774,148 @@ const styles = StyleSheet.create({
   },
   downloadBtnText: {
     color: '#fff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  authLockScrollContainer: {
+    padding: 20,
+    paddingTop: 36,
+    paddingBottom: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  authLockCard: {
+    width: '100%',
+    maxWidth: 540,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  authLockIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  authLockTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  authLockBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginTop: 4,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  authLockSubtitle: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  currentRoleNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  currentRoleNoticeLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  currentRoleBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  currentRoleBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  quickAdminBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingVertical: 13,
+    borderRadius: 12,
+    gap: 8,
+    marginBottom: 18,
+  },
+  quickAdminBtnText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  authLockDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    paddingHorizontal: 10,
+  },
+  authLockInputGroup: {
+    width: '100%',
+    marginBottom: 12,
+  },
+  authInputLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 6,
+  },
+  authInputBox: {
+    width: '100%',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    borderRadius: 10,
+    borderWidth: 1,
+    fontSize: 13,
+  },
+  authErrorText: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginVertical: 6,
+    textAlign: 'center',
+  },
+  authSubmitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingVertical: 13,
+    borderRadius: 12,
+    gap: 8,
+    marginTop: 8,
+  },
+  authSubmitBtnText: {
+    color: '#ffffff',
     fontSize: 13,
     fontWeight: '800',
   },

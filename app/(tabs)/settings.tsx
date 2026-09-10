@@ -75,8 +75,8 @@ export default function SettingsScreen() {
 
   // Authentication states
   const [isAuthMode, setIsAuthMode] = useState(false);
-  const [loginUsername, setLoginUsername] = useState('admin');
-  const [loginPassword, setLoginPassword] = useState('admin');
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [authMessage, setAuthMessage] = useState('');
   const [sqlCopied, setSqlCopied] = useState(false);
 

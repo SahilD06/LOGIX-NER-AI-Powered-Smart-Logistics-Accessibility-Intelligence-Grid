@@ -1,11 +1,13 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
-import { Activity, BarChart3, AlertOctagon, Camera, Radio, Settings } from 'lucide-react-native';
+import { Activity, BarChart3, AlertOctagon, Camera, Radio, Settings, Lock } from 'lucide-react-native';
 import { useAppTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 
 export default function TabLayout() {
   const { colors, isDark } = useAppTheme();
+  const { currentRole } = useAuth();
 
   return (
     <Tabs
@@ -42,8 +44,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="analytics"
         options={{
-          title: 'Analytics',
-          tabBarIcon: ({ color }) => <BarChart3 size={22} color={color} />,
+          title: currentRole === 'admin' ? 'Analytics' : 'Analytics 🔒',
+          tabBarIcon: ({ color }) =>
+            currentRole === 'admin' ? (
+              <BarChart3 size={22} color={color} />
+            ) : (
+              <Lock size={20} color={color} />
+            ),
         }}
       />
       <Tabs.Screen

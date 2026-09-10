@@ -174,10 +174,10 @@ Execute the SQL script in [`supabase_schema.sql`](./supabase_schema.sql) within 
 
 ## 📚 Research & Official References
 
-* 🌐 **[ISRO Bhuvan Landslide Atlas of India (NRSC)](https://bhuvan-app1.nrsc.gov.in/landslide/)** — National remote sensing inventory & slope vulnerability zonation models.
-* ⛰️ **[GSI National Landslide Susceptibility Mapping (NLSM)](https://www.gsi.gov.in/)** — Empirical rainfall threshold models (intensity-duration relationships triggering slope failure).
-* 🌧️ **[Open-Meteo Global Weather & Soil Moisture API](https://open-meteo.com/)** — ECMWF satellite real-time soil saturation & precipitation feeds.
-* 📜 **[NDMA National Disaster Management Guidelines](https://ndma.gov.in/)** — Standard operating procedures for landslide early warning and NDRF emergency response.
+* 🌐 **[ISRO Bhuvan Landslide Atlas of India (NRSC)](https://bhuvan-app1.nrsc.gov.in/disaster/disaster.php?id=landslide_monitor)** — National remote sensing inventory & slope vulnerability zonation models.
+* ⛰️ **[GSI National Landslide Susceptibility Mapping (NLSM)](https://gsi.gov.in/home/)** — Empirical rainfall threshold models (intensity-duration relationships triggering slope failure).
+* 🌧️ **[Open-Meteo Global Weather & Soil Moisture API](https://open-meteo.com)** — ECMWF satellite real-time soil saturation & precipitation rate feeds.
+* 📜 **[NDMA National Disaster Management Guidelines](https://ndma.gov.in)** — Standard operating procedures for landslide early warning and NDRF emergency response.
 
 ---
 

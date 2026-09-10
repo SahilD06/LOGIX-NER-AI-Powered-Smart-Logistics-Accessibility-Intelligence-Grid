@@ -292,7 +292,7 @@ export default function DashboardScreen() {
           </View>
 
           <Text style={[styles.analyticsSummaryText, { color: colors.textSecondary }]}>
-            Explore the multi-dimensional Tableau charts: Soil Saturation Risk Matrix Heatmap, Precipitation Boxplots, 10-tier Canopy Retention, and What-If Disaster Simulator.
+            Explore the multi-dimensional geotechnical charts: Soil Saturation Risk Matrix Heatmap, Precipitation Boxplots, 10-tier Canopy Retention, and What-If Disaster Simulator.
           </Text>
 
           <View style={[styles.analyticsQuickStatsRow, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
@@ -309,8 +309,8 @@ export default function DashboardScreen() {
               <Text style={[styles.statMiniLabel, { color: colors.textMuted }]}>Failure Slope</Text>
             </View>
             <View style={styles.statMiniItem}>
-              <Text style={[styles.statMiniVal, { color: colors.steelBlue }]}>Tableau</Text>
-              <Text style={[styles.statMiniLabel, { color: colors.textMuted }]}>Master Board</Text>
+              <Text style={[styles.statMiniVal, { color: colors.steelBlue }]}>Master</Text>
+              <Text style={[styles.statMiniLabel, { color: colors.textMuted }]}>Analytics Board</Text>
             </View>
           </View>
         </TouchableOpacity>

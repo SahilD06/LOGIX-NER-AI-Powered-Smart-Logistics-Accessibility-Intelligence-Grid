@@ -127,7 +127,7 @@ export default function AnalyticsScreen() {
             </Text>
 
             <Text style={[styles.authLockSubtitle, { color: colors.textSecondary }]}>
-              The Empirical Geotechnical Tableau Matrix, 7-Model Machine Learning Leaderboard, Failure Mechanics Diagnostic Plots, and What-If Disaster Simulator are restricted strictly to authorized NDRF Command Administrators.
+              The Empirical Geotechnical Analytics Matrix, 7-Model Machine Learning Leaderboard, Failure Mechanics Diagnostic Plots, and What-If Disaster Simulator are restricted strictly to authorized NDRF Command Administrators.
             </Text>
 
             {/* Current Session Banner */}
@@ -286,7 +286,7 @@ export default function AnalyticsScreen() {
                 { color: viewMode === 'master' ? '#fff' : colors.textSecondary },
               ]}
             >
-              Tableau Board
+              Overview Board
             </Text>
           </TouchableOpacity>
 

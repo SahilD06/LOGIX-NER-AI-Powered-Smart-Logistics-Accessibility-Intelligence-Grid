@@ -290,3 +290,69 @@ function getOfflineChatResponse(prompt: string): string {
   }
   return `🛡️ **LOGIX AI Response:**\n\nFor active landslide zones, maintain a safe perimeter, do not attempt to cross flooded causeways or debris streams, and dispatch a verified geotagged report via the **Report** tab to notify emergency response teams.`;
 }
+
+/**
+ * Process recorded microphone audio with Gemini Multimodal AI for universal speech-to-intent recognition
+ */
+export async function processVoiceAudioWithGemini(
+  audioBlob: Blob
+): Promise<{ spokenText: string; isPanicCommand: boolean; actionType: string; feedbackResponse: string } | null> {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) return null;
+
+  try {
+    const { base64, mimeType } = await fileToBase64(audioBlob);
+    const cleanMime = mimeType && mimeType.includes('audio') ? mimeType : 'audio/webm';
+
+    const prompt = `You are LOGIX Voice AI Assistant for landslide disaster management and emergency transport in North East India.
+Listen to this user speech audio.
+Analyze what the user said and output a strictly valid JSON object:
+{
+  "spokenText": "exact words spoken by user in English/Hindi/Regional language",
+  "isPanicCommand": true or false (true if user says help, bachao, sos, save me, emergency, khatra, bipod, landslide, or yarap),
+  "actionType": "SOS" | "ALERTS" | "HELPLINES" | "SHELTERS" | "WEATHER" | "ROUTES" | "UNKNOWN",
+  "feedbackResponse": "concise, helpful 1-2 sentence spoken advisory response for the user in English"
+}
+Return ONLY the raw JSON without backticks or markdown.`;
+
+    for (const model of GEMINI_MODELS) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    inline_data: {
+                      mime_type: cleanMime,
+                      data: base64,
+                    },
+                  },
+                  { text: prompt },
+                ],
+              },
+            ],
+          }),
+        });
+
+        if (!response.ok) continue;
+        const data = await response.json();
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanJson);
+        if (parsed?.spokenText || parsed?.feedbackResponse) {
+          return parsed;
+        }
+      } catch (innerErr) {
+        console.warn(`Gemini audio model ${model} error:`, innerErr);
+      }
+    }
+  } catch (e) {
+    console.warn('processVoiceAudioWithGemini error:', e);
+  }
+  return null;
+}
+

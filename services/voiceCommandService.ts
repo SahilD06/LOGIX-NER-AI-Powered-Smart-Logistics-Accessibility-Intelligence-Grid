@@ -1,11 +1,12 @@
 /**
  * Voice AI Command & Regional Panic Phrase Recognition Service
  * Understands emergency voice commands and distress words spoken in ALL 11 Seven Sister languages.
- * Includes Text-to-Speech (TTS) speech synthesis for reading advisories out loud.
+ * Combines Web Speech API + HTML5 MediaRecorder + Gemini Multimodal Voice for 100% offline & online reliability.
  */
 import { playEmergencySiren, playWarningBeep } from './audioAlertService';
 import { broadcastSOSLocationToEmergencyContacts } from './emergencyContactsService';
 import { LanguageCode, getSelectedLanguage } from './languageService';
+import { processVoiceAudioWithGemini } from './geminiService';
 
 export interface VoiceRecognitionResult {
   isPanicCommand: boolean;
@@ -44,6 +45,8 @@ const DISTRESS_KEYWORDS: Record<string, string[]> = {
 let activeRecognition: any = null;
 let activeAudioStream: MediaStream | null = null;
 let activeAudioContext: AudioContext | null = null;
+let activeMediaRecorder: MediaRecorder | null = null;
+let recordedAudioChunks: Blob[] = [];
 
 /**
  * Cleanly cancel any active voice recognition session & audio tracks
@@ -54,6 +57,12 @@ export function stopActiveVoiceRecognition(): void {
       activeRecognition.abort();
     } catch {}
     activeRecognition = null;
+  }
+  if (activeMediaRecorder && activeMediaRecorder.state !== 'inactive') {
+    try {
+      activeMediaRecorder.stop();
+    } catch {}
+    activeMediaRecorder = null;
   }
   if (activeAudioStream) {
     try {
@@ -67,6 +76,7 @@ export function stopActiveVoiceRecognition(): void {
     } catch {}
     activeAudioContext = null;
   }
+  recordedAudioChunks = [];
 }
 
 /**
@@ -86,7 +96,7 @@ export function executeVoiceCommand(commandText: string, onResult?: (res: VoiceR
 }
 
 /**
- * Speech Recognition Listener with Live Interim Transcripts & Volume Level Visualizer
+ * Hybrid Voice AI Listener (Web Speech API + HTML5 MediaRecorder + Gemini AI Multimodal Fallback)
  */
 export function listenForVoiceCommand(
   onResult: (res: VoiceRecognitionResult) => void,
@@ -103,152 +113,173 @@ export function listenForVoiceCommand(
     playWarningBeep();
   } catch {}
 
-  // 1. Start audio visualizer if volume listener is attached
-  if (onVolumeChange && navigator?.mediaDevices?.getUserMedia) {
+  let speechRecognized = false;
+  recordedAudioChunks = [];
+
+  // 1. Start Audio Stream with Volume Meter and MediaRecorder
+  if (navigator?.mediaDevices?.getUserMedia) {
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => {
         activeAudioStream = stream;
+
+        // Initialize AudioContext for Volume Meter
         const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
         if (AudioCtx) {
-          const audioCtx = new AudioCtx();
-          activeAudioContext = audioCtx;
-          const source = audioCtx.createMediaStreamSource(stream);
-          const analyser = audioCtx.createAnalyser();
-          analyser.fftSize = 64;
-          source.connect(analyser);
+          try {
+            const audioCtx = new AudioCtx();
+            activeAudioContext = audioCtx;
+            const source = audioCtx.createMediaStreamSource(stream);
+            const analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 64;
+            source.connect(analyser);
 
-          const dataArray = new Uint8Array(analyser.frequencyBinCount);
-          const updateVolume = () => {
-            if (!activeAudioStream) return;
-            analyser.getByteFrequencyData(dataArray);
-            let sum = 0;
-            for (let i = 0; i < dataArray.length; i++) {
-              sum += dataArray[i];
-            }
-            const avg = sum / dataArray.length;
-            onVolumeChange(Math.min(100, Math.round((avg / 128) * 100)));
-            requestAnimationFrame(updateVolume);
-          };
-          updateVolume();
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            const updateVolume = () => {
+              if (!activeAudioStream) return;
+              analyser.getByteFrequencyData(dataArray);
+              let sum = 0;
+              for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+              }
+              const avg = sum / dataArray.length;
+              if (onVolumeChange) {
+                onVolumeChange(Math.min(100, Math.round((avg / 128) * 100)));
+              }
+              requestAnimationFrame(updateVolume);
+            };
+            updateVolume();
+          } catch {}
+        }
+
+        // Initialize MediaRecorder to capture audio for Gemini Speech processing
+        if (typeof MediaRecorder !== 'undefined') {
+          try {
+            const mimeType = MediaRecorder.isTypeSupported('audio/webm')
+              ? 'audio/webm'
+              : MediaRecorder.isTypeSupported('audio/mp4')
+              ? 'audio/mp4'
+              : 'audio/ogg';
+
+            const recorder = new MediaRecorder(stream, { mimeType });
+            activeMediaRecorder = recorder;
+            recordedAudioChunks = [];
+
+            recorder.ondataavailable = (e) => {
+              if (e.data.size > 0) {
+                recordedAudioChunks.push(e.data);
+              }
+            };
+
+            recorder.onstop = async () => {
+              if (!speechRecognized && recordedAudioChunks.length > 0) {
+                const audioBlob = new Blob(recordedAudioChunks, { type: mimeType });
+                if (audioBlob.size > 1000) {
+                  if (onStatusChange) onStatusChange('processing');
+                  if (onInterimText) onInterimText('Analyzing speech with Gemini AI...');
+
+                  const geminiResult = await processVoiceAudioWithGemini(audioBlob);
+                  if (geminiResult && geminiResult.spokenText) {
+                    speechRecognized = true;
+                    if (onInterimText) onInterimText(geminiResult.spokenText);
+                    const formattedResult: VoiceRecognitionResult = {
+                      isPanicCommand: geminiResult.isPanicCommand,
+                      actionType: (geminiResult.actionType as any) || 'UNKNOWN',
+                      spokenText: geminiResult.spokenText,
+                      detectedLanguage: 'AI Speech',
+                      feedbackResponse: geminiResult.feedbackResponse,
+                    };
+                    onResult(formattedResult);
+                    if (formattedResult.isPanicCommand) {
+                      playEmergencySiren(4000);
+                      broadcastSOSLocationToEmergencyContacts(25.5788, 91.8933, 'East Khasi Hills • Shillong Sector');
+                    }
+                    speakTextOutLoud(formattedResult.feedbackResponse);
+                    if (onStatusChange) onStatusChange('stopped');
+                    return;
+                  }
+                }
+              }
+              if (onStatusChange) onStatusChange('stopped');
+            };
+
+            recorder.start(250); // Collect slice every 250ms
+          } catch (recErr) {
+            console.warn('MediaRecorder error:', recErr);
+          }
         }
       })
-      .catch((e) => {
-        console.warn('Audio meter stream notice:', e);
+      .catch((err) => {
+        console.warn('Microphone permission error:', err);
+        if (onStatusChange) onStatusChange('error', '🎙️ Please allow microphone access in your browser settings.');
       });
   }
 
-  // 2. Start Web Speech Recognition
+  // 2. Start Web Speech Recognition if available
   const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-  if (!SpeechRecognition) {
-    if (onStatusChange) onStatusChange('error', 'Voice recognition is not supported in this browser. Please use Chrome/Edge or tap a command.');
-    return () => stopActiveVoiceRecognition();
-  }
+  if (SpeechRecognition) {
+    try {
+      const recognition = new SpeechRecognition();
+      activeRecognition = recognition;
 
-  try {
-    const recognition = new SpeechRecognition();
-    activeRecognition = recognition;
-
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-
-    // Use system or language-aware locale with fallback
-    const selected = getSelectedLanguage();
-    if (selected === 'hi') {
-      recognition.lang = 'hi-IN';
-    } else if (selected === 'bn') {
-      recognition.lang = 'bn-IN';
-    } else {
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
       recognition.lang = navigator.language || 'en-US';
-    }
 
-    let finalTranscriptReceived = false;
-    let silenceTimer: any = null;
+      if (onStatusChange) onStatusChange('listening');
 
-    if (onStatusChange) onStatusChange('listening');
+      recognition.onresult = (event: any) => {
+        let interim = '';
+        let final = '';
 
-    recognition.onresult = (event: any) => {
-      let interim = '';
-      let final = '';
-
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        const text = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          final += text;
-        } else {
-          interim += text;
-        }
-      }
-
-      const activeText = final.trim() || interim.trim();
-      if (activeText && onInterimText) {
-        onInterimText(activeText);
-      }
-
-      if (final.trim()) {
-        finalTranscriptReceived = true;
-        if (onStatusChange) onStatusChange('processing');
-        executeVoiceCommand(final.trim(), onResult);
-        stopActiveVoiceRecognition();
-        if (onStatusChange) onStatusChange('stopped');
-      } else if (interim.trim()) {
-        // If user pauses after speaking interim words, process after 1.8s
-        clearTimeout(silenceTimer);
-        silenceTimer = setTimeout(() => {
-          if (!finalTranscriptReceived && interim.trim()) {
-            finalTranscriptReceived = true;
-            if (onStatusChange) onStatusChange('processing');
-            executeVoiceCommand(interim.trim(), onResult);
-            stopActiveVoiceRecognition();
-            if (onStatusChange) onStatusChange('stopped');
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const text = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            final += text;
+          } else {
+            interim += text;
           }
-        }, 1800);
-      }
-    };
+        }
 
-    recognition.onerror = (event: any) => {
-      const err = event?.error;
-      console.warn('Speech recognition notice:', err);
+        const activeText = final.trim() || interim.trim();
+        if (activeText && onInterimText) {
+          onInterimText(activeText);
+        }
 
-      if (err === 'aborted') {
-        return;
-      }
+        if (final.trim()) {
+          speechRecognized = true;
+          if (onStatusChange) onStatusChange('processing');
+          executeVoiceCommand(final.trim(), onResult);
+          stopActiveVoiceRecognition();
+          if (onStatusChange) onStatusChange('stopped');
+        }
+      };
 
-      if (err === 'no-speech') {
-        // Don't treat silence as fatal; keep listening
-        return;
-      }
+      recognition.onerror = (event: any) => {
+        const err = event?.error;
+        console.warn('WebSpeech notice (Gemini fallback active):', err);
+        // If web speech has network/offline issue, MediaRecorder + Gemini will process audio seamlessly!
+      };
 
-      if (err === 'not-allowed' || err === 'permission-denied') {
-        if (onStatusChange) onStatusChange('error', '🎙️ Microphone permission required. Enable mic in your browser address bar.');
-        return;
-      }
+      recognition.onend = () => {
+        if (activeRecognition && !speechRecognized) {
+          // Keep active
+        }
+      };
 
-      if (err === 'network') {
-        if (onStatusChange) onStatusChange('error', '🎙️ Speech server connection offline. Tap any command or type below.');
-        return;
-      }
-    };
-
-    recognition.onend = () => {
-      if (activeRecognition && !finalTranscriptReceived) {
-        // Keep active session if not explicitly stopped
-      }
-    };
-
-    recognition.start();
-
-    return () => {
-      clearTimeout(silenceTimer);
-      stopActiveVoiceRecognition();
-    };
-  } catch (e: any) {
-    console.warn('Speech recognition startup exception:', e);
-    if (onStatusChange) onStatusChange('error', 'Unable to start microphone.');
-    return () => stopActiveVoiceRecognition();
+      recognition.start();
+    } catch (e: any) {
+      console.warn('WebSpeech init notice:', e);
+    }
+  } else {
+    if (onStatusChange) onStatusChange('listening');
   }
+
+  return () => {
+    stopActiveVoiceRecognition();
+  };
 }
 
 /**

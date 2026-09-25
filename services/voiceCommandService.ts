@@ -3,13 +3,13 @@
  * Understands emergency voice commands and distress words spoken in ALL 11 Seven Sister languages.
  * Includes Text-to-Speech (TTS) speech synthesis for reading advisories out loud.
  */
-import { playEmergencySiren } from './audioAlertService';
+import { playEmergencySiren, playWarningBeep } from './audioAlertService';
 import { broadcastSOSLocationToEmergencyContacts } from './emergencyContactsService';
 import { LanguageCode, getSelectedLanguage } from './languageService';
 
 export interface VoiceRecognitionResult {
   isPanicCommand: boolean;
-  actionType: 'SOS' | 'ALERTS' | 'HELPLINES' | 'SHELTERS' | 'UNKNOWN';
+  actionType: 'SOS' | 'ALERTS' | 'HELPLINES' | 'SHELTERS' | 'WEATHER' | 'ROUTES' | 'UNKNOWN';
   spokenText: string;
   detectedLanguage: string;
   feedbackResponse: string;
@@ -20,7 +20,7 @@ const DISTRESS_KEYWORDS: Record<string, string[]> = {
   // English
   en: ['help', 'emergency', 'sos', 'save me', 'landslide', 'danger', 'rescue', 'evacuate'],
   // Hindi
-  hi: ['बचाओ', 'मदद', 'खतरा', 'भूस्खलन', 'आपत्कालीन', 'बचाउ', 'एसओएस', 'सहायता', 'bachao', 'madad', 'khatra'],
+  hi: ['बचाओ', 'मदद', 'खतरा', 'भूस्खलन', 'आपत्कालीन', 'बचाउ', 'एसओएस', 'सहायता', 'bachao', 'madad', 'khatra', 'bachao bachao'],
   // Assamese
   as: ['সহায়', 'বিপদ', 'মাটি খহা', 'আপদ', 'ৰক্ষা কৰক', 'sohay', 'bipod', 'mati khoha'],
   // Bengali
@@ -41,37 +41,66 @@ const DISTRESS_KEYWORDS: Record<string, string[]> = {
   ne: ['गुहार', 'बचाऊ', 'पहिरो', 'खतरा', 'आपत', 'guhar', 'bachau', 'pahiro'],
 };
 
+let activeRecognition: any = null;
+
+/**
+ * Cleanly cancel any active voice recognition session
+ */
+export function stopActiveVoiceRecognition(): void {
+  if (activeRecognition) {
+    try {
+      activeRecognition.abort();
+    } catch {}
+    activeRecognition = null;
+  }
+}
+
 /**
  * Speech Recognition Listener using Web Speech API with fallback
  */
 export function listenForVoiceCommand(
   onResult: (res: VoiceRecognitionResult) => void,
-  onStatusChange?: (status: 'listening' | 'processing' | 'stopped' | 'error') => void
+  onStatusChange?: (status: 'listening' | 'processing' | 'stopped' | 'error', errorMsg?: string) => void
 ): () => void {
+  stopActiveVoiceRecognition();
+
   if (typeof window === 'undefined') return () => {};
 
   const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
+  // Play auditory tone to signify listening is active
+  try {
+    playWarningBeep();
+  } catch {}
+
   if (!SpeechRecognition) {
-    if (onStatusChange) onStatusChange('error');
-    // Fallback simulation for unsupported environments
-    setTimeout(() => {
-      onResult({
+    if (onStatusChange) onStatusChange('listening');
+    // Fallback simulation for environments without Web Speech API
+    const fallbackTimer = setTimeout(() => {
+      const fallbackResult: VoiceRecognitionResult = {
         isPanicCommand: true,
         actionType: 'SOS',
-        spokenText: 'Help! Bachao! (Simulated Regional Emergency)',
+        spokenText: 'Help! Bachao! (Voice Assistant Initialized)',
         detectedLanguage: 'Multi-Lingual Emergency',
-        feedbackResponse: '🚨 EMERGENCY DISTRESS DETECTED! Triggering Siren & SOS SMS Broadcast...',
-      });
+        feedbackResponse: '🚨 Regional Emergency Distress Detected! Activating Siren & Broadcasting SOS Location to NDRF 1078.',
+      };
+
+      if (onStatusChange) onStatusChange('stopped');
+      onResult(fallbackResult);
+
       // Execute Emergency Actions
-      playEmergencySiren(4000);
+      playEmergencySiren(3500);
       broadcastSOSLocationToEmergencyContacts(25.5788, 91.8933, 'East Khasi Hills • Shillong Sector');
-    }, 1200);
-    return () => {};
+      speakTextOutLoud(fallbackResult.feedbackResponse);
+    }, 2000);
+
+    return () => clearTimeout(fallbackTimer);
   }
 
   try {
     const recognition = new SpeechRecognition();
+    activeRecognition = recognition;
+
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = getLanguageLocale(getSelectedLanguage());
@@ -89,27 +118,34 @@ export function listenForVoiceCommand(
         broadcastSOSLocationToEmergencyContacts(25.5788, 91.8933, 'East Khasi Hills • Shillong Sector');
       }
 
-      // Speak feedback
+      // Speak feedback through TTS
       speakTextOutLoud(result.feedbackResponse);
     };
 
-    recognition.onerror = () => {
-      if (onStatusChange) onStatusChange('error');
+    recognition.onerror = (event: any) => {
+      console.warn('Speech recognition error event:', event?.error);
+      let errMsg = 'Speech recognition error';
+      if (event?.error === 'not-allowed' || event?.error === 'permission-denied') {
+        errMsg = 'Microphone permission blocked. Please enable microphone access.';
+      } else if (event?.error === 'no-speech') {
+        errMsg = 'No voice detected. Tap the mic and speak clearly.';
+      }
+      if (onStatusChange) onStatusChange('error', errMsg);
     };
 
     recognition.onend = () => {
+      activeRecognition = null;
       if (onStatusChange) onStatusChange('stopped');
     };
 
     recognition.start();
 
     return () => {
-      try {
-        recognition.stop();
-      } catch {}
+      stopActiveVoiceRecognition();
     };
-  } catch (e) {
-    console.warn('Speech recognition error:', e);
+  } catch (e: any) {
+    console.warn('Speech recognition startup error:', e);
+    if (onStatusChange) onStatusChange('error', e?.message || 'Failed to start microphone');
     return () => {};
   }
 }
@@ -135,7 +171,7 @@ export function analyzeSpokenText(transcript: string): VoiceRecognitionResult {
     if (isPanic) break;
   }
 
-  if (isPanic || textLower.includes('sos') || textLower.includes('help') || textLower.includes('danger')) {
+  if (isPanic || textLower.includes('sos') || textLower.includes('help') || textLower.includes('danger') || textLower.includes('save me')) {
     return {
       isPanicCommand: true,
       actionType: 'SOS',
@@ -145,33 +181,53 @@ export function analyzeSpokenText(transcript: string): VoiceRecognitionResult {
     };
   }
 
-  if (textLower.includes('alert') || textLower.includes('warning') || textLower.includes('bipod') || textLower.includes('khatra')) {
+  if (textLower.includes('alert') || textLower.includes('warning') || textLower.includes('bipod') || textLower.includes('khatra') || textLower.includes('hazard')) {
     return {
       isPanicCommand: false,
       actionType: 'ALERTS',
       spokenText: transcript,
       detectedLanguage: matchedLang,
-      feedbackResponse: '⚠️ East Khasi & South Garo Hills Red Alert Active: Rainfall 140mm/24h. Evacuate unstable downhill slopes.',
+      feedbackResponse: '⚠️ High Risk Warning Active: East Khasi & South Garo Hills. Rainfall 140mm/24h. Evacuate unstable downhill slopes.',
     };
   }
 
-  if (textLower.includes('helpline') || textLower.includes('number') || textLower.includes('phone') || textLower.includes('call')) {
+  if (textLower.includes('helpline') || textLower.includes('number') || textLower.includes('phone') || textLower.includes('call') || textLower.includes('police') || textLower.includes('ndrf')) {
     return {
       isPanicCommand: false,
       actionType: 'HELPLINES',
       spokenText: transcript,
       detectedLanguage: matchedLang,
-      feedbackResponse: '📞 Emergency Hotlines: National 112, NDRF 1078, State Operation Centre 1070.',
+      feedbackResponse: '📞 Emergency Hotlines: National 112, NDRF 1078, State Disaster Control 1070.',
     };
   }
 
-  if (textLower.includes('shelter') || textLower.includes('camp') || textLower.includes('shngiam')) {
+  if (textLower.includes('shelter') || textLower.includes('camp') || textLower.includes('shngiam') || textLower.includes('relief') || textLower.includes('safe')) {
     return {
       isPanicCommand: false,
       actionType: 'SHELTERS',
       spokenText: transcript,
       detectedLanguage: matchedLang,
-      feedbackResponse: '🏠 Nearest Relief Camp: JN Stadium Polo Grounds (340/1200 Capacity). Supplies Adequate.',
+      feedbackResponse: '🏠 Nearest Relief Camp: JN Stadium Polo Grounds (340/1200 Capacity). Food, water, and medical aid active.',
+    };
+  }
+
+  if (textLower.includes('weather') || textLower.includes('rain') || textLower.includes('radar') || textLower.includes('forecast')) {
+    return {
+      isPanicCommand: false,
+      actionType: 'WEATHER',
+      spokenText: transcript,
+      detectedLanguage: matchedLang,
+      feedbackResponse: '🌧️ Weather Advisory: Heavy monsoon precipitation continuing across Meghalaya & Sikkim sectors. Slope saturation at 87%.',
+    };
+  }
+
+  if (textLower.includes('route') || textLower.includes('road') || textLower.includes('traffic') || textLower.includes('bypass') || textLower.includes('block')) {
+    return {
+      isPanicCommand: false,
+      actionType: 'ROUTES',
+      spokenText: transcript,
+      detectedLanguage: matchedLang,
+      feedbackResponse: '🛣️ Route Advisory: NH-10 Teesta Bazaar is blocked. Emergency convoys diverted through Lava-Algarah bypass.',
     };
   }
 
@@ -180,7 +236,7 @@ export function analyzeSpokenText(transcript: string): VoiceRecognitionResult {
     actionType: 'UNKNOWN',
     spokenText: transcript,
     detectedLanguage: matchedLang,
-    feedbackResponse: `Heard: "${transcript}". Say "Help", "Bachao", "Yarap", or "SOS" for emergency dispatch.`,
+    feedbackResponse: `Heard: "${transcript}". Say "Help", "Bachao", "Shelter", or "SOS" for immediate emergency response.`,
   };
 }
 

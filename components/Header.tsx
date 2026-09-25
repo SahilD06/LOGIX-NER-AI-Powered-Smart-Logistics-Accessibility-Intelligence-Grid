@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, Image, Modal, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Image, Modal, ScrollView, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ShieldAlert, PhoneCall, User, FlaskConical, Globe, Mic, MicOff, Volume2, X, Check } from 'lucide-react-native';
+import { ShieldAlert, PhoneCall, User, FlaskConical, Globe, Mic, MicOff, Volume2, X, Check, Radio } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -15,6 +15,7 @@ import {
 } from '../services/languageService';
 import {
   listenForVoiceCommand,
+  stopActiveVoiceRecognition,
   VoiceRecognitionResult,
 } from '../services/voiceCommandService';
 
@@ -36,10 +37,32 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
   const [showLangModal, setShowLangModal] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [voiceFeedback, setVoiceFeedback] = useState<string | null>(null);
+  const [pulseAnim] = useState(new Animated.Value(1));
 
   useEffect(() => {
     setCurrentLangState(getSelectedLanguage());
   }, []);
+
+  useEffect(() => {
+    if (isListening) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.25,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      pulseAnim.setValue(1);
+    }
+  }, [isListening]);
 
   const t = getTranslations(currentLang);
   const activeLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === currentLang) || SUPPORTED_LANGUAGES[0];
@@ -52,22 +75,27 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
 
   const handleToggleVoiceAssistant = () => {
     if (isListening) {
+      stopActiveVoiceRecognition();
       setIsListening(false);
       setVoiceFeedback(null);
       return;
     }
 
     setIsListening(true);
-    setVoiceFeedback(t.listeningVoice);
+    setVoiceFeedback(null);
 
     listenForVoiceCommand(
       (result: VoiceRecognitionResult) => {
         setIsListening(false);
-        setVoiceFeedback(`📢 ${result.feedbackResponse}`);
-        setTimeout(() => setVoiceFeedback(null), 6000);
+        setVoiceFeedback(result.feedbackResponse);
+        setTimeout(() => setVoiceFeedback(null), 8000);
       },
-      (status) => {
-        if (status === 'stopped' || status === 'error') {
+      (status, errorMsg) => {
+        if (status === 'error') {
+          setIsListening(false);
+          setVoiceFeedback(errorMsg || '⚠️ Microphone unavailable. Tap to retry.');
+          setTimeout(() => setVoiceFeedback(null), 5000);
+        } else if (status === 'stopped') {
           setIsListening(false);
         }
       }
@@ -75,109 +103,129 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
   };
 
   return (
-    <View style={[styles.header, { backgroundColor: colors.cardBg, borderBottomColor: colors.border, paddingTop: safeTop }]}>
-      <View style={styles.titleContainer}>
-        <View style={styles.logoRow}>
-          <View style={[styles.shieldIconWrapper, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
-            <ShieldAlert size={16} color={colors.steelBlue} />
+    <View style={[styles.headerContainer, { backgroundColor: colors.cardBg, borderBottomColor: colors.border, paddingTop: safeTop }]}>
+      {/* Top Main Navigation Row */}
+      <View style={styles.headerTopRow}>
+        <View style={styles.titleContainer}>
+          <View style={styles.logoRow}>
+            <View style={[styles.shieldIconWrapper, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
+              <ShieldAlert size={16} color={colors.steelBlue} />
+            </View>
+            <View style={styles.titleTextCol}>
+              <Text style={[styles.appTitle, { color: colors.textPrimary }]} numberOfLines={1}>
+                {t.appTitle}
+              </Text>
+              <Text style={[styles.appSubtitle, { color: colors.steelBlue }]} numberOfLines={1}>
+                {t.appSubtitle}
+              </Text>
+            </View>
           </View>
-          <View style={styles.titleTextCol}>
-            <Text style={[styles.appTitle, { color: colors.textPrimary }]} numberOfLines={1}>
-              {t.appTitle}
-            </Text>
-            <Text style={[styles.appSubtitle, { color: colors.steelBlue }]} numberOfLines={1}>
-              {t.appSubtitle}
-            </Text>
+        </View>
+
+        <View style={styles.actionRow}>
+          {/* Seven Sisters Language Selector */}
+          <TouchableOpacity
+            style={[styles.langBtn, { backgroundColor: colors.subPanel, borderColor: colors.border }]}
+            onPress={() => setShowLangModal(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.langFlag}>{activeLangObj.flag}</Text>
+            <Text style={[styles.langCodeText, { color: colors.textPrimary }]}>{activeLangObj.code.toUpperCase()}</Text>
+          </TouchableOpacity>
+
+          {/* Multi-Lingual Voice AI Mic Assistant */}
+          <TouchableOpacity
+            style={[
+              styles.micBtn,
+              {
+                backgroundColor: isListening ? colors.dangerBg : colors.subPanel,
+                borderColor: isListening ? colors.dangerBorder : colors.border,
+              },
+            ]}
+            onPress={handleToggleVoiceAssistant}
+            activeOpacity={0.8}
+          >
+            {isListening ? (
+              <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+                <Mic size={16} color={colors.danger} />
+              </Animated.View>
+            ) : (
+              <MicOff size={14} color={colors.steelBlue} />
+            )}
+          </TouchableOpacity>
+
+          {/* Theme Switcher */}
+          <View style={{ width: 46, height: 26, justifyContent: 'center', alignItems: 'center' }}>
+            <ThemeToggleSwitch scale={0.7} />
           </View>
+
+          {/* Helpline Button */}
+          <TouchableOpacity
+            style={[styles.helplineButton, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]}
+            onPress={() => router.push('/modal')}
+            activeOpacity={0.8}
+          >
+            <PhoneCall size={12} color={colors.danger} />
+            <Text style={[styles.helplineText, { color: colors.danger }]}>1078</Text>
+          </TouchableOpacity>
+
+          {/* User Avatar / Login Shortcut */}
+          <TouchableOpacity
+            style={[
+              styles.userButton,
+              {
+                backgroundColor:
+                  currentRole === 'admin'
+                    ? colors.dangerBg
+                    : currentRole === 'tester'
+                    ? colors.warningBg
+                    : colors.subPanel,
+                borderColor:
+                  currentRole === 'admin'
+                    ? colors.dangerBorder
+                    : currentRole === 'tester'
+                    ? colors.warningBorder
+                    : colors.border,
+              },
+            ]}
+            onPress={() => router.push('/(tabs)/settings')}
+            activeOpacity={0.8}
+          >
+            {isAuthenticated && currentRole === 'admin' ? (
+              <ShieldAlert size={15} color={colors.danger} />
+            ) : isAuthenticated && currentRole === 'tester' ? (
+              <FlaskConical size={15} color={colors.warning} />
+            ) : isAuthenticated && user?.photoUrl ? (
+              <Image source={{ uri: user.photoUrl }} style={styles.userAvatarImg} />
+            ) : (
+              <User size={14} color={colors.steelBlue} />
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 
-      <View style={styles.actionRow}>
-        {/* Seven Sisters Language Selector */}
-        <TouchableOpacity
-          style={[styles.langBtn, { backgroundColor: colors.subPanel, borderColor: colors.border }]}
-          onPress={() => setShowLangModal(true)}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.langFlag}>{activeLangObj.flag}</Text>
-          <Text style={[styles.langCodeText, { color: colors.textPrimary }]}>{activeLangObj.code.toUpperCase()}</Text>
-        </TouchableOpacity>
-
-        {/* Multi-Lingual Voice AI Mic Assistant */}
-        <TouchableOpacity
-          style={[
-            styles.micBtn,
-            {
-              backgroundColor: isListening ? colors.dangerBg : colors.subPanel,
-              borderColor: isListening ? colors.dangerBorder : colors.border,
-            },
-          ]}
-          onPress={handleToggleVoiceAssistant}
-          activeOpacity={0.8}
-        >
-          {isListening ? (
-            <Mic size={15} color={colors.danger} />
-          ) : (
-            <MicOff size={14} color={colors.steelBlue} />
-          )}
-        </TouchableOpacity>
-
-        {/* Theme Switcher */}
-        <View style={{ width: 46, height: 26, justifyContent: 'center', alignItems: 'center' }}>
-          <ThemeToggleSwitch scale={0.7} />
+      {/* Active Recording / Listening Indicator Banner */}
+      {isListening && (
+        <View style={[styles.activeListeningBanner, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]}>
+          <View style={styles.listeningLeftCol}>
+            <Animated.View style={[styles.recordingDot, { transform: [{ scale: pulseAnim }] }]} />
+            <Text style={[styles.activeListeningText, { color: colors.danger }]}>
+              🎙️ {t.listeningVoice || 'Listening...'} <Text style={styles.listeningHint}>Say "Help", "Bachao", "SOS", "Shelters", "Weather"</Text>
+            </Text>
+          </View>
+          <TouchableOpacity onPress={handleToggleVoiceAssistant} style={[styles.cancelVoiceBtn, { borderColor: colors.dangerBorder }]}>
+            <Text style={[styles.cancelVoiceText, { color: colors.danger }]}>Cancel</Text>
+          </TouchableOpacity>
         </View>
-
-        {/* Helpline Button */}
-        <TouchableOpacity
-          style={[styles.helplineButton, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]}
-          onPress={() => router.push('/modal')}
-          activeOpacity={0.8}
-        >
-          <PhoneCall size={12} color={colors.danger} />
-          <Text style={[styles.helplineText, { color: colors.danger }]}>1078</Text>
-        </TouchableOpacity>
-
-        {/* User Avatar / Login Shortcut */}
-        <TouchableOpacity
-          style={[
-            styles.userButton,
-            {
-              backgroundColor:
-                currentRole === 'admin'
-                  ? colors.dangerBg
-                  : currentRole === 'tester'
-                  ? colors.warningBg
-                  : colors.subPanel,
-              borderColor:
-                currentRole === 'admin'
-                  ? colors.dangerBorder
-                  : currentRole === 'tester'
-                  ? colors.warningBorder
-                  : colors.border,
-            },
-          ]}
-          onPress={() => router.push('/(tabs)/settings')}
-          activeOpacity={0.8}
-        >
-          {isAuthenticated && currentRole === 'admin' ? (
-            <ShieldAlert size={15} color={colors.danger} />
-          ) : isAuthenticated && currentRole === 'tester' ? (
-            <FlaskConical size={15} color={colors.warning} />
-          ) : isAuthenticated && user?.photoUrl ? (
-            <Image source={{ uri: user.photoUrl }} style={styles.userAvatarImg} />
-          ) : (
-            <User size={14} color={colors.steelBlue} />
-          )}
-        </TouchableOpacity>
-      </View>
+      )}
 
       {/* Voice Assistant Feedback Banner */}
       {voiceFeedback ? (
         <View style={[styles.voiceFeedbackBanner, { backgroundColor: colors.steelBlue, borderColor: colors.border }]}>
           <Volume2 size={16} color="#ffffff" />
           <Text style={styles.voiceFeedbackText}>{voiceFeedback}</Text>
-          <TouchableOpacity onPress={() => setVoiceFeedback(null)}>
-            <X size={14} color="#ffffff" />
+          <TouchableOpacity onPress={() => setVoiceFeedback(null)} style={styles.closeFeedbackBtn}>
+            <X size={15} color="#ffffff" />
           </TouchableOpacity>
         </View>
       ) : null}
@@ -238,16 +286,19 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
 };
 
 const styles = StyleSheet.create({
-  header: {
+  headerContainer: {
     paddingHorizontal: 12,
-    paddingBottom: 10,
+    paddingBottom: 8,
     borderBottomWidth: 1,
+    flexDirection: 'column',
+    elevation: 4,
+    zIndex: 100,
+  },
+  headerTopRow: {
     flexDirection: 'row',
     flexWrap: 'nowrap',
     alignItems: 'center',
     justifyContent: 'space-between',
-    elevation: 4,
-    zIndex: 100,
     gap: 6,
   },
   titleContainer: {
@@ -339,11 +390,55 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  activeListeningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 6,
+  },
+  listeningLeftCol: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  recordingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ef4444',
+  },
+  activeListeningText: {
+    fontSize: 11,
+    fontWeight: '800',
+    flex: 1,
+  },
+  listeningHint: {
+    fontWeight: '500',
+    opacity: 0.85,
+    fontSize: 10,
+  },
+  cancelVoiceBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginLeft: 6,
+  },
+  cancelVoiceText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
   voiceFeedbackBanner: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
     borderRadius: 8,
     borderWidth: 1,
     marginTop: 6,
@@ -354,6 +449,10 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 11,
     fontWeight: '700',
+    lineHeight: 15,
+  },
+  closeFeedbackBtn: {
+    padding: 2,
   },
   modalOverlay: {
     flex: 1,

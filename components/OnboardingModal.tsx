@@ -277,7 +277,7 @@ export function OnboardingModal() {
                         borderColor: isDark ? '#334155' : '#CBD5E1',
                       },
                     ]}
-                    placeholder="e.g. Rahul Sharma"
+                    placeholder="Enter your name"
                     placeholderTextColor={colors.textMuted}
                     value={userName}
                     onChangeText={setUserName}
@@ -295,7 +295,7 @@ export function OnboardingModal() {
                         borderColor: isDark ? '#334155' : '#CBD5E1',
                       },
                     ]}
-                    placeholder="e.g. +91 9876543210"
+                    placeholder="Enter phone number"
                     placeholderTextColor={colors.textMuted}
                     keyboardType="phone-pad"
                     value={userPhone}
@@ -325,7 +325,7 @@ export function OnboardingModal() {
                         borderColor: isDark ? '#334155' : '#CBD5E1',
                       },
                     ]}
-                    placeholder="e.g. Family Contact"
+                    placeholder="Enter contact name"
                     placeholderTextColor={colors.textMuted}
                     value={emergencyName}
                     onChangeText={setEmergencyName}
@@ -345,7 +345,7 @@ export function OnboardingModal() {
                         borderColor: isDark ? '#334155' : '#CBD5E1',
                       },
                     ]}
-                    placeholder="e.g. +91 9123456789"
+                    placeholder="Enter phone number"
                     placeholderTextColor={colors.textMuted}
                     keyboardType="phone-pad"
                     value={emergencyPhone}

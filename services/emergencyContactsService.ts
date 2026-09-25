@@ -14,15 +14,8 @@ export interface EmergencyContactPerson {
 
 const STORAGE_KEY = 'rakshak_emergency_contacts_v1';
 
-// Default initial emergency contacts if empty
-const DEFAULT_CONTACTS: EmergencyContactPerson[] = [
-  {
-    id: 'cnt-01',
-    name: 'Family Emergency Guard',
-    phone: '+919876543210',
-    relation: 'Primary Contact',
-  },
-];
+// Default initial emergency contacts if empty (starts clean)
+const DEFAULT_CONTACTS: EmergencyContactPerson[] = [];
 
 /**
  * Get saved emergency contacts from local storage (max 3)

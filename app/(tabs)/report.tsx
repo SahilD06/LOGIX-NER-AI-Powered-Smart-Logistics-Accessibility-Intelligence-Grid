@@ -732,7 +732,7 @@ export default function FieldReportScreen() {
                 style={[styles.textInput, styles.textArea, { backgroundColor: colors.subPanel, color: colors.textPrimary, borderColor: colors.border }]}
                 value={remarks}
                 onChangeText={setRemarks}
-                placeholder="E.g., Boulders fallen on left lane, water seepage observed from upper slope..."
+                placeholder="Describe observations, fallen boulders, water seepage, or road blockage..."
                 placeholderTextColor={colors.textMuted}
                 multiline
                 numberOfLines={4}

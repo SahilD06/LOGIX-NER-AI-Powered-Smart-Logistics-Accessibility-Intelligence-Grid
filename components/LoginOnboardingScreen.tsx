@@ -152,8 +152,8 @@ export function LoginOnboardingScreen() {
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [birthdate, setBirthdate] = useState('');
-  const [bloodGroup, setBloodGroup] = useState('O+');
-  const [photoUri, setPhotoUri] = useState<string>(PRESET_AVATARS[0].url);
+  const [bloodGroup, setBloodGroup] = useState('');
+  const [photoUri, setPhotoUri] = useState<string>('');
 
   // STEP 4: Precise GPS Location & Alerts
   const [isLocating, setIsLocating] = useState(false);
@@ -165,7 +165,7 @@ export function LoginOnboardingScreen() {
   // STEP 5: Emergency Safety Contact
   const [emergencyName, setEmergencyName] = useState('');
   const [emergencyPhone, setEmergencyPhone] = useState('');
-  const [emergencyRelation, setEmergencyRelation] = useState(RELATIONSHIPS[0]);
+  const [emergencyRelation, setEmergencyRelation] = useState('');
 
   // SIGN IN MODE STATE
   const [loginUsername, setLoginUsername] = useState('');
@@ -485,7 +485,7 @@ export function LoginOnboardingScreen() {
                   <User size={16} color={colors.textMuted} />
                   <TextInput
                     style={[styles.inputField, { color: colors.textPrimary }]}
-                    placeholder="e.g. admin or citizen@rakshak.in"
+                    placeholder="Username or email"
                     placeholderTextColor={colors.textMuted}
                     value={loginUsername}
                     onChangeText={setLoginUsername}
@@ -879,7 +879,7 @@ export function LoginOnboardingScreen() {
                       <User size={16} color={colors.textMuted} />
                       <TextInput
                         style={[styles.inputField, { color: colors.textPrimary }]}
-                        placeholder="e.g. Carol Pillai"
+                        placeholder="Enter your full name"
                         placeholderTextColor={colors.textMuted}
                         value={fullName}
                         onChangeText={setFullName}
@@ -896,7 +896,7 @@ export function LoginOnboardingScreen() {
                       </View>
                       <TextInput
                         style={[styles.inputField, { color: colors.textPrimary }]}
-                        placeholder="98765 43210"
+                        placeholder="Enter mobile number"
                         placeholderTextColor={colors.textMuted}
                         keyboardType="phone-pad"
                         value={phoneNumber}
@@ -912,7 +912,7 @@ export function LoginOnboardingScreen() {
                       <Calendar size={16} color={colors.textMuted} />
                       <TextInput
                         style={[styles.inputField, { color: colors.textPrimary }]}
-                        placeholder="DD / MM / YYYY (e.g. 15/08/1998)"
+                        placeholder="DD / MM / YYYY"
                         placeholderTextColor={colors.textMuted}
                         value={birthdate}
                         onChangeText={setBirthdate}
@@ -1227,7 +1227,7 @@ export function LoginOnboardingScreen() {
                       <User size={16} color={colors.textMuted} />
                       <TextInput
                         style={[styles.inputField, { color: colors.textPrimary }]}
-                        placeholder="e.g. Mary Pillai"
+                        placeholder="Enter emergency contact name"
                         placeholderTextColor={colors.textMuted}
                         value={emergencyName}
                         onChangeText={setEmergencyName}
@@ -1246,7 +1246,7 @@ export function LoginOnboardingScreen() {
                       </View>
                       <TextInput
                         style={[styles.inputField, { color: colors.textPrimary }]}
-                        placeholder="98765 43210"
+                        placeholder="Enter mobile number"
                         placeholderTextColor={colors.textMuted}
                         keyboardType="phone-pad"
                         value={emergencyPhone}
@@ -1274,9 +1274,8 @@ export function LoginOnboardingScreen() {
                     <Text style={[styles.smsPreviewText, { color: colors.textSecondary }]}>
                       "🚨 EMERGENCY LANDSLIDE ALERT! I have triggered an SOS on RAKSHAK NER. Live GPS:{' '}
                       {userLocation
-                        ? `${userLocation.latitude.toFixed(4)}°N, ${userLocation.longitude.toFixed(4)}°E`
-                        : '25.5788°N, 91.8933°E'}{' '}
-                      ({userLocation?.locationName || selectedSectorFallback})."
+                        ? `${userLocation.latitude.toFixed(4)}°N, ${userLocation.longitude.toFixed(4)}°E (${userLocation.locationName})`
+                        : '[Live GPS coordinates and nearest monitored sector will be attached automatically]'}"
                     </Text>
                   </View>
 
@@ -1342,7 +1341,13 @@ export function LoginOnboardingScreen() {
 
                     {/* Pass Body */}
                     <View style={styles.passBodyRow}>
-                      <Image source={{ uri: photoUri }} style={[styles.passAvatar, { borderColor: colors.steelBlue }]} />
+                      {photoUri ? (
+                        <Image source={{ uri: photoUri }} style={[styles.passAvatar, { borderColor: colors.steelBlue }]} />
+                      ) : (
+                        <View style={[styles.passAvatar, { borderColor: colors.steelBlue, backgroundColor: colors.cardBg, justifyContent: 'center', alignItems: 'center' }]}>
+                          <User size={28} color={colors.steelBlue} />
+                        </View>
+                      )}
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.passName, { color: colors.textPrimary }]}>
                           {fullName.trim() || 'Citizen Responder'}
@@ -1351,7 +1356,7 @@ export function LoginOnboardingScreen() {
                           Role: Citizen Responder
                         </Text>
                         <Text style={[styles.passSubDetail, { color: colors.textMuted }]}>
-                          DOB: {birthdate.trim() || 'Not Specified'} • Blood: {bloodGroup}
+                          DOB: {birthdate.trim() || 'Not Specified'} • Blood: {bloodGroup || 'Not Specified'}
                         </Text>
                       </View>
                     </View>
@@ -1393,8 +1398,10 @@ export function LoginOnboardingScreen() {
                         </Text>
                         <Text style={[styles.passDetailValue, { color: colors.textPrimary }]}>
                           {emergencyName.trim()
-                            ? `${emergencyName} (${emergencyRelation})`
-                            : 'Family Guard (+91 9876543210)'}
+                            ? `${emergencyName} ${emergencyRelation ? `(${emergencyRelation})` : ''}`
+                            : emergencyPhone.trim()
+                            ? emergencyPhone
+                            : 'Not configured'}
                         </Text>
                       </View>
                     </View>

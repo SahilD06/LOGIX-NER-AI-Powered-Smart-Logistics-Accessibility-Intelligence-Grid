@@ -652,14 +652,14 @@ export default function SettingsScreen() {
               <View style={styles.contactFormRow}>
                 <TextInput
                   style={[styles.inputBox, { flex: 1, backgroundColor: colors.cardBg, color: colors.textPrimary, borderColor: colors.border }]}
-                  placeholder="Name (e.g. Mom)"
+                  placeholder="Contact name"
                   placeholderTextColor={colors.textMuted}
                   value={newContactName}
                   onChangeText={setNewContactName}
                 />
                 <TextInput
                   style={[styles.inputBox, { flex: 1, backgroundColor: colors.cardBg, color: colors.textPrimary, borderColor: colors.border }]}
-                  placeholder="Phone (+91 98765...)"
+                  placeholder="Phone number"
                   placeholderTextColor={colors.textMuted}
                   value={newContactPhone}
                   onChangeText={setNewContactPhone}
@@ -669,7 +669,7 @@ export default function SettingsScreen() {
               <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 8 }}>
                 <TextInput
                   style={[styles.inputBox, { flex: 1, backgroundColor: colors.cardBg, color: colors.textPrimary, borderColor: colors.border }]}
-                  placeholder="Relation (e.g. Family/Friend)"
+                  placeholder="Relationship"
                   placeholderTextColor={colors.textMuted}
                   value={newContactRelation}
                   onChangeText={setNewContactRelation}

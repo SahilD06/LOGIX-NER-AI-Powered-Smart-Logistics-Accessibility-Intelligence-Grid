@@ -241,6 +241,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const fullUrl = window.location.href;
       if (fullUrl.includes('access_token')) {
+        const stateMatch = fullUrl.match(/state=([^&]+)/);
+        const tokenMatch = fullUrl.match(/access_token=([^&]+)/);
+        if (stateMatch && stateMatch[1] && tokenMatch && tokenMatch[1]) {
+          const returnToApp = decodeURIComponent(stateMatch[1]);
+          if (returnToApp.startsWith('exp://') || returnToApp.startsWith('logix-ner://') || returnToApp.includes('8081')) {
+            const separator = returnToApp.includes('#') ? '&' : '#';
+            window.location.href = `${returnToApp}${separator}access_token=${tokenMatch[1]}`;
+            return;
+          }
+        }
+
         try {
           window.sessionStorage?.removeItem('google_auth_for_onboarding');
           window.sessionStorage?.removeItem('pending_onboarding_google_user');
@@ -359,47 +370,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = async (forOnboarding: boolean = false): Promise<AppUser | null> => {
     setIsLoading(true);
 
-    const redirectUri =
-      Platform.OS === 'web' && typeof window !== 'undefined'
-        ? window.location.origin
-        : Linking.createURL('/');
-
     const clientId = googleClientId || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
 
-    // 1. Direct Official Google OAuth 2.0 (if valid client ID is provided in .env)
-    if (process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID && process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID !== DEFAULT_GOOGLE_CLIENT_ID) {
+    // Web Platform: direct redirect to Google OAuth
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const redirectUri = window.location.origin;
       const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
         redirectUri
       )}&response_type=token&scope=openid%20email%20profile&prompt=select_account`;
 
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        try {
-          if (forOnboarding) {
-            window.sessionStorage.setItem('google_auth_for_onboarding', 'true');
-          }
-          window.location.href = googleAuthUrl;
-          return null;
-        } catch (err) {
-          console.warn('Direct Google redirect error:', err);
+      try {
+        window.location.href = googleAuthUrl;
+        return null;
+      } catch (err) {
+        console.warn('Direct Google redirect error:', err);
+      }
+    } else {
+      // Mobile Native (Expo Go): Proxy through verified Vercel web domain to bypass Google's exp:// restriction
+      try {
+        const appReturnUri = Linking.createURL('/');
+        const webProxyRedirect = 'https://rakshak-livid.vercel.app';
+        const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+          webProxyRedirect
+        )}&response_type=token&scope=openid%20email%20profile&prompt=select_account&state=${encodeURIComponent(appReturnUri)}`;
+
+        const result = await WebBrowser.openAuthSessionAsync(googleAuthUrl, appReturnUri);
+        if (result.type === 'success' && result.url) {
+          const u = await handleOAuthRedirectUrl(result.url, true);
+          setIsLoading(false);
+          return u;
         }
-      } else {
-        // In Expo Go on Android/iOS, Google rejects exp:// URI schemes for Web Client IDs.
-        // Instantly sign in mobile user without opening the blocked browser screen:
-        const mobileUser: AppUser = {
-          id: `g-mobile-${Date.now()}`,
-          name: 'Google Mobile Citizen',
-          email: 'citizen.mobile@gmail.com',
-          photoUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-          role: 'user',
-          roleTitle: 'Citizen Responder',
-          givenName: 'Citizen',
-          onboardingCompleted: true,
-        };
-        saveUserSession(mobileUser);
-        setIsLoading(false);
-        return mobileUser;
+      } catch (err) {
+        console.warn('Mobile Google Auth Proxy error:', err);
       }
     }
+
+    setIsLoading(false);
+    return null;
+  };
 
     // 2. On Web: Use Google Identity Services (GIS) Token Client popup if initialized
     if (Platform.OS === 'web' && typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2) {

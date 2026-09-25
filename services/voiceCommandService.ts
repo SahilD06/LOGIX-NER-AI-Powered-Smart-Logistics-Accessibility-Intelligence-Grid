@@ -20,7 +20,7 @@ const DISTRESS_KEYWORDS: Record<string, string[]> = {
   // English
   en: ['help', 'emergency', 'sos', 'save me', 'landslide', 'danger', 'rescue', 'evacuate'],
   // Hindi
-  hi: ['बचाओ', 'मदद', 'खतरा', 'भूस्खलन', 'आपत्कालीन', 'बचाउ', 'एसओएस', 'सहायता', 'bachao', 'madad', 'khatra', 'bachao bachao'],
+  hi: ['बचाओ', 'मदद', 'खतरा', 'भूस्खलन', 'आपत्कालीन', 'बचाउ', 'एसओएस', 'सहायता', 'bachao', 'madad', 'khatra'],
   // Assamese
   as: ['সহায়', 'বিপদ', 'মাটি খহা', 'আপদ', 'ৰক্ষা কৰক', 'sohay', 'bipod', 'mati khoha'],
   // Bengali
@@ -72,7 +72,8 @@ export function executeVoiceCommand(commandText: string, onResult: (res: VoiceRe
 }
 
 /**
- * Speech Recognition Listener using Web Speech API with fallback
+ * Speech Recognition Listener using Web Speech API
+ * Only triggers actions when actual speech is captured.
  */
 export async function listenForVoiceCommand(
   onResult: (res: VoiceRecognitionResult) => void,
@@ -82,12 +83,17 @@ export async function listenForVoiceCommand(
 
   if (typeof window === 'undefined') return () => {};
 
-  // Play auditory tone to signify listening is active
+  // Auditory chime to indicate listening is active
   try {
     playWarningBeep();
   } catch {}
 
   const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    if (onStatusChange) onStatusChange('error', 'Voice recognition is not supported in this browser. Please use Chrome/Edge or tap a quick action below.');
+    return () => {};
+  }
 
   // Request browser microphone permission if possible
   if (navigator?.mediaDevices?.getUserMedia) {
@@ -96,21 +102,10 @@ export async function listenForVoiceCommand(
     } catch (permErr: any) {
       console.warn('Microphone permission request:', permErr);
       if (permErr?.name === 'NotAllowedError' || permErr?.name === 'PermissionDeniedError') {
-        if (onStatusChange) onStatusChange('error', '🎙️ Please allow microphone access in browser settings to speak.');
+        if (onStatusChange) onStatusChange('error', '🎙️ Please allow microphone access in browser settings.');
         return () => {};
       }
     }
-  }
-
-  if (!SpeechRecognition) {
-    if (onStatusChange) onStatusChange('listening');
-    // Fallback response for unsupported browser engines
-    const fallbackTimer = setTimeout(() => {
-      const fallbackResult = executeVoiceCommand('Help! Bachao! (Voice Assistant Active)', onResult);
-      if (onStatusChange) onStatusChange('stopped');
-    }, 1500);
-
-    return () => clearTimeout(fallbackTimer);
   }
 
   try {
@@ -119,46 +114,39 @@ export async function listenForVoiceCommand(
 
     recognition.continuous = false;
     recognition.interimResults = false;
-    // Use fallback-friendly locale
     recognition.lang = getLanguageLocale(getSelectedLanguage());
 
     if (onStatusChange) onStatusChange('listening');
 
     recognition.onresult = (event: any) => {
-      if (onStatusChange) onStatusChange('processing');
       const transcript = event.results?.[0]?.[0]?.transcript || '';
       if (transcript.trim()) {
+        if (onStatusChange) onStatusChange('processing');
         executeVoiceCommand(transcript, onResult);
-      } else {
-        if (onStatusChange) onStatusChange('stopped');
       }
+      if (onStatusChange) onStatusChange('stopped');
     };
 
     recognition.onerror = (event: any) => {
       const err = event?.error;
-      console.warn('Speech recognition notice:', err);
+      console.warn('Speech recognition event:', err);
 
-      if (err === 'aborted') {
-        if (onStatusChange) onStatusChange('stopped');
-        return;
-      }
-
-      if (err === 'no-speech') {
+      if (err === 'aborted' || err === 'no-speech') {
         if (onStatusChange) onStatusChange('stopped');
         return;
       }
 
       if (err === 'not-allowed' || err === 'permission-denied') {
-        if (onStatusChange) onStatusChange('error', '🎙️ Mic permission needed. Tap to allow & retry.');
+        if (onStatusChange) onStatusChange('error', '🎙️ Mic permission denied. Enable microphone in browser settings.');
         return;
       }
 
-      // If browser network or cloud recognizer has issue, fallback gracefully
-      if (err === 'network' || err === 'audio-capture' || err === 'language-not-supported') {
-        // Automatically fallback to speech query assistant
-        if (onStatusChange) onStatusChange('stopped');
-        executeVoiceCommand('Help SOS', onResult);
+      if (err === 'network') {
+        if (onStatusChange) onStatusChange('error', '🎙️ Voice network timeout. Tap a quick command or try speaking again.');
+        return;
       }
+
+      if (onStatusChange) onStatusChange('stopped');
     };
 
     recognition.onend = () => {
@@ -172,9 +160,7 @@ export async function listenForVoiceCommand(
       stopActiveVoiceRecognition();
     };
   } catch (e: any) {
-    console.warn('Speech recognition startup:', e);
-    // Fallback to quick simulated voice trigger
-    const fallbackResult = executeVoiceCommand('Help SOS', onResult);
+    console.warn('Speech recognition startup error:', e);
     if (onStatusChange) onStatusChange('stopped');
     return () => {};
   }

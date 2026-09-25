@@ -280,7 +280,7 @@ export function OnboardingModal() {
                         borderColor: isDark ? '#334155' : '#CBD5E1',
                       },
                     ]}
-                    placeholder="e.g. Carol Pillai"
+                    placeholder="e.g. Rahul Sharma"
                     placeholderTextColor={colors.textMuted}
                     value={userName}
                     onChangeText={setUserName}
@@ -328,7 +328,7 @@ export function OnboardingModal() {
                         borderColor: isDark ? '#334155' : '#CBD5E1',
                       },
                     ]}
-                    placeholder="e.g. Mom - Mary Pillai"
+                    placeholder="e.g. Family Contact"
                     placeholderTextColor={colors.textMuted}
                     value={emergencyName}
                     onChangeText={setEmergencyName}

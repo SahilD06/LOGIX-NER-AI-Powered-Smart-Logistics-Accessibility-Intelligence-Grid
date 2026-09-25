@@ -174,11 +174,6 @@ export function LoginOnboardingScreen() {
   const [signInError, setSignInError] = useState('');
   const [isSigningIn, setIsSigningIn] = useState(false);
 
-  // Google Quick-Auth Sheet State (Fallback for unverified Google OAuth local dev client)
-  const [showGoogleAuthModal, setShowGoogleAuthModal] = useState(false);
-  const [googleAuthEmail, setGoogleAuthEmail] = useState('pillaimarshall129@gmail.com');
-  const [googleAuthName, setGoogleAuthName] = useState('Carol Pillai');
-
   // Translations
   const t = getTranslations(selectedLang);
 
@@ -229,43 +224,9 @@ export function LoginOnboardingScreen() {
     setIsSigningIn(true);
     setSignInError('');
     try {
-      const isOnboarding = mode === 'onboarding';
-      const authedUser = await signInWithGoogle(isOnboarding);
-      if (authedUser) {
-        if (authedUser.name) setFullName(authedUser.name);
-        if (authedUser.email) setAccountEmail(authedUser.email);
-        if (authedUser.photoUrl) setPhotoUri(authedUser.photoUrl);
-        if (isOnboarding) setCurrentStep(3);
-      } else {
-        // Open Google Account Quick-Auth Sheet for instant login
-        setShowGoogleAuthModal(true);
-      }
+      await signInWithGoogle(false);
     } catch (e: any) {
-      setShowGoogleAuthModal(true);
-    } finally {
-      setIsSigningIn(false);
-    }
-  };
-
-  const handleConfirmGoogleAuthModal = async () => {
-    if (!googleAuthEmail.trim()) return;
-    setShowGoogleAuthModal(false);
-    setIsSigningIn(true);
-    try {
-      const gUser = {
-        name: googleAuthName.trim() || googleAuthEmail.split('@')[0],
-        email: googleAuthEmail.trim(),
-        photoUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-      };
-      await loginWithGoogleProfile(gUser);
-      setFullName(gUser.name);
-      setAccountEmail(gUser.email);
-      setPhotoUri(gUser.photoUrl);
-      if (mode === 'onboarding') {
-        setCurrentStep(3);
-      }
-    } catch (e) {
-      setSignInError('Google sign in failed');
+      setSignInError('Google sign in error. Please try again.');
     } finally {
       setIsSigningIn(false);
     }
@@ -1482,73 +1443,6 @@ export function LoginOnboardingScreen() {
         </View>
       </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* Google Account Quick Auth Modal */}
-      <Modal visible={showGoogleAuthModal} transparent animationType="slide" onRequestClose={() => setShowGoogleAuthModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <GoogleLogoIcon size={22} />
-                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Google Sign-In</Text>
-              </View>
-              <TouchableOpacity onPress={() => setShowGoogleAuthModal(false)}>
-                <X size={20} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={[styles.modalSub, { color: colors.textSecondary }]}>
-              Authorize your Google Account to log in to LOGIX-NER Smart Logistics Grid:
-            </Text>
-
-            <View style={[styles.inputGroup, { marginTop: 10 }]}>
-              <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>Google Email Address</Text>
-              <View style={[styles.inputBox, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-                <Mail size={16} color={colors.steelBlue} />
-                <TextInput
-                  style={[styles.inputField, { color: colors.textPrimary }]}
-                  value={googleAuthEmail}
-                  onChangeText={setGoogleAuthEmail}
-                  placeholder="name@gmail.com"
-                  placeholderTextColor={colors.textMuted}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                />
-              </View>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>Full Name</Text>
-              <View style={[styles.inputBox, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-                <User size={16} color={colors.steelBlue} />
-                <TextInput
-                  style={[styles.inputField, { color: colors.textPrimary }]}
-                  value={googleAuthName}
-                  onChangeText={setGoogleAuthName}
-                  placeholder="Your Name"
-                  placeholderTextColor={colors.textMuted}
-                />
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.primaryBtn, { backgroundColor: colors.steelBlue, marginTop: 14 }]}
-              onPress={handleConfirmGoogleAuthModal}
-              activeOpacity={0.85}
-            >
-              <GoogleLogoIcon size={16} />
-              <Text style={styles.primaryBtnText}>Sign In as {googleAuthEmail.split('@')[0] || 'User'}</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={{ alignItems: 'center', marginTop: 12, paddingVertical: 6 }}
-              onPress={() => setShowGoogleAuthModal(false)}
-            >
-              <Text style={{ fontSize: 11, color: colors.textMuted, fontWeight: '700' }}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }

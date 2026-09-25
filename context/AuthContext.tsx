@@ -241,18 +241,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const fullUrl = window.location.href;
       if (fullUrl.includes('access_token')) {
-        const wasOnboarding = window.sessionStorage?.getItem('google_auth_for_onboarding') === 'true';
         try {
           window.sessionStorage?.removeItem('google_auth_for_onboarding');
+          window.sessionStorage?.removeItem('pending_onboarding_google_user');
         } catch {}
 
-        handleOAuthRedirectUrl(fullUrl, !wasOnboarding).then((u) => {
-          if (u && wasOnboarding) {
-            try {
-              window.sessionStorage?.setItem('pending_onboarding_google_user', JSON.stringify(u));
-            } catch {}
-          }
-        });
+        handleOAuthRedirectUrl(fullUrl, true);
 
         try {
           window.history.replaceState(null, '', window.location.pathname);
@@ -370,9 +364,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ? window.location.origin
         : Linking.createURL('/');
 
-    const clientId = googleClientId || DEFAULT_GOOGLE_CLIENT_ID;
+    const clientId = googleClientId || process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
 
-    // 1. On Web: Use Google Identity Services (GIS) Token Client popup if available
+    // 1. Direct Official Google OAuth 2.0 (if valid client ID is provided in .env)
+    if (process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID && process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID !== DEFAULT_GOOGLE_CLIENT_ID) {
+      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+        redirectUri
+      )}&response_type=token&scope=openid%20email%20profile&prompt=select_account`;
+
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        try {
+          if (forOnboarding) {
+            window.sessionStorage.setItem('google_auth_for_onboarding', 'true');
+          }
+          window.location.href = googleAuthUrl;
+          return null;
+        } catch (err) {
+          console.warn('Direct Google redirect error:', err);
+        }
+      } else {
+        try {
+          const result = await WebBrowser.openAuthSessionAsync(googleAuthUrl, redirectUri);
+          if (result.type === 'success' && result.url) {
+            const u = await handleOAuthRedirectUrl(result.url, !forOnboarding);
+            setIsLoading(false);
+            return u;
+          }
+        } catch (err) {
+          console.warn('WebBrowser error:', err);
+        }
+      }
+    }
+
+    // 2. On Web: Use Google Identity Services (GIS) Token Client popup if initialized
     if (Platform.OS === 'web' && typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2) {
       try {
         const authedUser = await new Promise<AppUser | null>((resolve) => {
@@ -413,38 +437,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return authedUser;
         }
       } catch (gisErr) {
-        console.warn('GIS Token client exception, falling back to direct redirect:', gisErr);
-      }
-    }
-
-    // 2. Direct Official Google OAuth 2.0 (accounts.google.com)
-    // Only redirect if explicit custom client_id is set via EXPO_PUBLIC_GOOGLE_CLIENT_ID
-    if (process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID && process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID !== DEFAULT_GOOGLE_CLIENT_ID) {
-      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
-        redirectUri
-      )}&response_type=token&scope=openid%20email%20profile&prompt=select_account`;
-
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        try {
-          if (forOnboarding) {
-            window.sessionStorage.setItem('google_auth_for_onboarding', 'true');
-          }
-          window.location.href = googleAuthUrl;
-          return null;
-        } catch (err) {
-          console.warn('Direct Google redirect error:', err);
-        }
-      } else {
-        try {
-          const result = await WebBrowser.openAuthSessionAsync(googleAuthUrl, redirectUri);
-          if (result.type === 'success' && result.url) {
-            const u = await handleOAuthRedirectUrl(result.url, !forOnboarding);
-            setIsLoading(false);
-            return u;
-          }
-        } catch (err) {
-          console.warn('WebBrowser error:', err);
-        }
+        console.warn('GIS Token client exception:', gisErr);
       }
     }
 

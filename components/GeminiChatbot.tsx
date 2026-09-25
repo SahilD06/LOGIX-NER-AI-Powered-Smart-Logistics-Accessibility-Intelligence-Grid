@@ -57,7 +57,7 @@ export function GeminiChatbot() {
       id: 'welcome',
       role: 'assistant',
       content:
-        `👋 **Welcome to LOGIX AI!**\n\nI'm your 24/7 smart logistics & transport accessibility assistant powered by Google Gemini. (Speaking in **${activeLangObj.name}**). Ask me about **highway status (NH-10, NH-6, NH-58)**, **disaster supply convoys**, **NDRF helplines**, or **landslide road disruptions**.`,
+        `Hey! 👋 **Welcome to LOGIX AI!**\n\nHow can I help you navigate North-East India logistics today? I'm your 24/7 smart transport accessibility assistant powered by Google Gemini. (Speaking in **${activeLangObj.name}**).\n\nAsk me about **highway status (NH-10, NH-6, NH-58)**, **disaster supply convoys**, **NDRF helplines**, or **landslide road disruptions**.`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -429,6 +429,27 @@ export function GeminiChatbot() {
         </View>
       )}
 
+      {/* Floating Greeting Speech Bubble Badge above Chatbot */}
+      {!isOpen && (
+        <TouchableOpacity
+          style={[
+            styles.greetingBubble,
+            {
+              backgroundColor: colors.cardBg,
+              borderColor: colors.border,
+            },
+          ]}
+          onPress={() => setIsOpen(true)}
+          activeOpacity={0.85}
+        >
+          <Sparkles size={13} color={colors.steelBlue} />
+          <Text style={[styles.greetingBubbleText, { color: colors.textPrimary }]}>
+            Hey! 👋 Ask LOGIX AI
+          </Text>
+          <View style={[styles.bubbleTriangle, { borderTopColor: colors.cardBg }]} />
+        </TouchableOpacity>
+      )}
+
       {/* 2. Floating Toggle Button */}
       <TouchableOpacity
         style={[
@@ -466,6 +487,38 @@ const styles = StyleSheet.create({
     right: 18,
     zIndex: 9999,
     alignItems: 'flex-end',
+  },
+  greetingBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+    position: 'relative',
+  },
+  greetingBubbleText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+  },
+  bubbleTriangle: {
+    position: 'absolute',
+    bottom: -6,
+    right: 18,
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 6,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
   },
   fabButton: {
     width: 48,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Activity, AlertOctagon, Camera, Radio, Settings } from 'lucide-react-native';
+import { Compass, ShieldAlert, Camera, Radio, Settings2 } from 'lucide-react-native';
 import { useAppTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { CustomTabBar } from '../../components/CustomTabBar';
@@ -26,14 +26,14 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Dashboard',
-          tabBarIcon: ({ color, size }) => <Activity size={size || 22} color={color} />,
+          tabBarIcon: ({ color, size }) => <Compass size={size || 22} color={color} />,
         }}
       />
       <Tabs.Screen
         name="alerts"
         options={{
           title: 'Alerts',
-          tabBarIcon: ({ color, size }) => <AlertOctagon size={size || 22} color={color} />,
+          tabBarIcon: ({ color, size }) => <ShieldAlert size={size || 22} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -54,7 +54,7 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ color, size }) => <Settings size={size || 22} color={color} />,
+          tabBarIcon: ({ color, size }) => <Settings2 size={size || 22} color={color} />,
         }}
       />
     </Tabs>

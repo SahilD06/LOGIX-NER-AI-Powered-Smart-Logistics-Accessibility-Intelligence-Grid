@@ -1472,6 +1472,7 @@ const styles = StyleSheet.create({
   },
   contactFormRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     marginTop: 4,
   },

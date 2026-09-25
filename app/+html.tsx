@@ -16,6 +16,9 @@ export default function Root({ children }: { children: ReactNode }) {
 
         <ScrollViewStyleReset />
 
+        {/* Google Identity Services SDK */}
+        <script src="https://accounts.google.com/gsi/client" async defer></script>
+
         {/* Leaflet CSS */}
         <link
           rel="stylesheet"

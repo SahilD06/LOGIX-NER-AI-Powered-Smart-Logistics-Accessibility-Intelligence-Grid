@@ -360,3 +360,52 @@ export const EMERGENCY_CONTACTS: EmergencyContact[] = [
     category: 'State Control Room',
   },
 ];
+
+export interface EarlyWarningAlert {
+  id: string;
+  level: 'RED' | 'ORANGE' | 'YELLOW';
+  levelText: string;
+  timeAgo: string;
+  title: string;
+  body: string;
+  authority: string;
+  officialUrl: string;
+  smsPayload: string;
+}
+
+export const EARLY_WARNING_ALERTS: EarlyWarningAlert[] = [
+  {
+    id: 'ALERT-RED-01',
+    level: 'RED',
+    levelText: 'RED ALERT - LEVEL 4',
+    timeAgo: 'Issued 35 mins ago',
+    title: 'East Khasi & South Garo Hills Flash Warning',
+    body: 'Precipitation threshold exceeded (140mm / 24h). Critical instability detected in Sohra and Mawsynram slope cuts. Evacuation from unstable downhill settlements strongly advised.',
+    authority: 'Issued by India Meteorological Dept (IMD) & Meghalaya SDMA',
+    officialUrl: 'https://mausam.imd.gov.in',
+    smsPayload: '🚨 CRITICAL LANDSLIDE RED ALERT: Heavy precipitation (140mm/24h) in East Khasi & Garo Hills. Evacuate downhill slopes immediately! Helplines: NDRF 1078, SDMA 1070.',
+  },
+  {
+    id: 'ALERT-ORG-02',
+    level: 'ORANGE',
+    levelText: 'ORANGE WARNING - LEVEL 3',
+    timeAgo: 'Issued 2 hours ago',
+    title: 'Sikkim Highway NH-10 Mudflow Precaution',
+    body: 'Continuous seepage on 29th Mile and Teesta Valley roads. Heavy goods traffic restricted between 19:00 - 06:00. Use Lava - Algarah bypass if traveling.',
+    authority: 'Border Roads Organisation (BRO Task Force 144) Official Advisory',
+    officialUrl: 'https://bro.gov.in',
+    smsPayload: '⚠️ LANDSLIDE ORANGE WARNING: Sikkim NH-10 (29th Mile) mudflow active. Heavy traffic restricted 19:00-06:00. Use Lava-Algarah bypass. Helpline: 112.',
+  },
+  {
+    id: 'ALERT-YEL-03',
+    level: 'YELLOW',
+    levelText: 'YELLOW WATCH - LEVEL 2',
+    timeAgo: 'Issued 5 hours ago',
+    title: 'Dima Hasao Railway Section Surveillance',
+    body: 'Inclinometer ground sensors showing 0.4mm slow creep. Engineering teams deployed for slope anchoring.',
+    authority: 'Northeast Frontier Railway (NFR) Disaster Control',
+    officialUrl: 'https://nfr.indianrailways.gov.in',
+    smsPayload: 'ℹ️ LANDSLIDE WATCH: Dima Hasao railway section under slope surveillance. Engineering teams deployed. Stay tuned to RAKSHAK NER alerts.',
+  },
+];
+

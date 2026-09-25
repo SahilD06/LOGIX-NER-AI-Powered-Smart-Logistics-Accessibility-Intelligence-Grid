@@ -11,6 +11,7 @@ export interface HazardVerificationResult {
   detectedSubject: string;
   rejectionReason?: string;
   suggestedHazardType?: 'Active Mudslide' | 'Road Cracking' | 'Rockfall Hazard' | 'Retaining Wall Shift';
+  suggestedSeverity?: 'Low' | 'Moderate' | 'High' | 'Critical';
   modelUsed: string;
 }
 
@@ -143,6 +144,11 @@ export async function verifyLandslidePhoto(
   try {
     const geminiResult = await analyzeHazardImageWithGemini(imageSource, fileName);
     if (geminiResult) {
+      const geminiSeverity = geminiResult.severity === 'CRITICAL' ? 'Critical'
+        : geminiResult.severity === 'HIGH' ? 'High'
+        : geminiResult.severity === 'MODERATE' ? 'Moderate'
+        : 'Low';
+
       return {
         isLandslideHazard: geminiResult.isLandslideHazard,
         hazardCategory: geminiResult.isLandslideHazard ? (geminiResult.suggestedHazardType || 'Active Landslide') : 'Non-Hazard',
@@ -151,6 +157,7 @@ export async function verifyLandslidePhoto(
         authenticityConfidence: geminiResult.authenticityConfidence || authenticityConfidence,
         detectedSubject: geminiResult.detectedSubject,
         suggestedHazardType: geminiResult.suggestedHazardType,
+        suggestedSeverity: geminiSeverity,
         rejectionReason: geminiResult.rejectionReason,
         modelUsed: geminiResult.modelUsed,
       };
@@ -231,6 +238,7 @@ function evaluateClassificationLabels(
 
   if (isLandslide) {
     const hazardType = determineHazardType(predictions, fileName);
+    const suggestedSeverity = hazardType === 'Active Mudslide' ? 'High' : hazardType === 'Rockfall Hazard' ? 'Critical' : 'Moderate';
     return {
       isLandslideHazard: true,
       hazardCategory: hazardType,
@@ -239,6 +247,7 @@ function evaluateClassificationLabels(
       authenticityConfidence,
       detectedSubject: `Geological Hazard: ${hazardType}`,
       suggestedHazardType: hazardType,
+      suggestedSeverity,
       modelUsed: `${CLASSIFIER_MODEL} (Vision Transformer)`,
     };
   } else {
@@ -293,6 +302,7 @@ function evaluateLocalTerrainVisuals(
       authenticityConfidence,
       detectedSubject: 'Geological Slope Hazard / Mudflow',
       suggestedHazardType: 'Active Mudslide',
+      suggestedSeverity: 'High',
       modelUsed: `${CLASSIFIER_MODEL} (Vision Transformer)`,
     };
   }

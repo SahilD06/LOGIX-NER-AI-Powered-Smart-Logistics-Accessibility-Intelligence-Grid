@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Platform } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { supabase, syncUserProfile, UserRole, authenticateUserFromDatabase, registerUserInDatabase } from '../services/supabase';
+import { LanguageCode } from '../services/languageService';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export interface AppUser {
   id: string;
@@ -10,6 +15,22 @@ export interface AppUser {
   role: UserRole;
   roleTitle: string;
   givenName?: string;
+  phone?: string;
+  birthdate?: string;
+  bloodGroup?: string;
+  location?: {
+    latitude: number;
+    longitude: number;
+    locationName: string;
+    isPrecise: boolean;
+  };
+  emergencyContact?: {
+    name: string;
+    phone: string;
+    relation?: string;
+  };
+  preferredLanguage?: LanguageCode;
+  onboardingCompleted?: boolean;
 }
 
 export const ROLE_CONFIGS: Record<UserRole, { title: string; badge: string; desc: string }> = {
@@ -39,6 +60,7 @@ const DEFAULT_PRESET_USERS: Record<UserRole, AppUser> = {
     role: 'user',
     roleTitle: 'Citizen Responder',
     givenName: 'User',
+    onboardingCompleted: true,
   },
   admin: {
     id: 'adm-ndrf-9901',
@@ -48,6 +70,7 @@ const DEFAULT_PRESET_USERS: Record<UserRole, AppUser> = {
     role: 'admin',
     roleTitle: 'NDRF Command Administrator',
     givenName: 'Admin',
+    onboardingCompleted: true,
   },
   tester: {
     id: 'tst-dev-7703',
@@ -57,6 +80,7 @@ const DEFAULT_PRESET_USERS: Record<UserRole, AppUser> = {
     role: 'tester',
     roleTitle: 'QA & Simulation Tester',
     givenName: 'Tester',
+    onboardingCompleted: true,
   },
 };
 
@@ -67,10 +91,14 @@ interface AuthContextType {
   currentRole: UserRole;
   isAuthenticated: boolean;
   isLoading: boolean;
-  signInWithGoogle: () => Promise<void>;
+  signInWithGoogle: (forOnboarding?: boolean) => Promise<AppUser | null>;
+  loginWithGoogleProfile: (profile: { name: string; email: string; photoUrl?: string }) => Promise<void>;
   loginAsRole: (role: UserRole) => Promise<void>;
   loginWithCredentials: (username: string, password: string) => Promise<{ success: boolean; message?: string }>;
   registerNewUser: (username: string, password: string, name: string, email: string) => Promise<{ success: boolean; message?: string }>;
+  completeOnboarding: (userData: Partial<AppUser>) => Promise<void>;
+  updateUser: (updates: Partial<AppUser>) => void;
+  saveUserSession: (newUser: AppUser | null) => void;
   signOut: () => void;
   googleClientId: string;
   setGoogleClientId: (id: string) => void;
@@ -81,10 +109,14 @@ const AuthContext = createContext<AuthContextType>({
   currentRole: 'user',
   isAuthenticated: false,
   isLoading: false,
-  signInWithGoogle: async () => {},
+  signInWithGoogle: async () => null,
+  loginWithGoogleProfile: async () => {},
   loginAsRole: async () => {},
   loginWithCredentials: async () => ({ success: false }),
   registerNewUser: async () => ({ success: false }),
+  completeOnboarding: async () => {},
+  updateUser: () => {},
+  saveUserSession: () => {},
   signOut: () => {},
   googleClientId: '',
   setGoogleClientId: () => {},
@@ -125,7 +157,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Helper to fetch user info with access token and set as Citizen User
-  const fetchGoogleUser = async (accessToken: string) => {
+  const fetchGoogleUser = async (accessToken: string, setAsAuthenticated: boolean = true): Promise<AppUser | null> => {
     setIsLoading(true);
     try {
       const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
@@ -138,39 +170,99 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           name: data.name || data.email.split('@')[0],
           email: data.email,
           photoUrl: data.picture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-          givenName: data.given_name,
+          givenName: data.given_name || (data.name ? data.name.split(' ')[0] : 'Citizen'),
           role: 'user', // All Google logins get citizen user role by default
           roleTitle: 'Citizen Responder',
+          onboardingCompleted: setAsAuthenticated,
         };
-        saveUserSession(newUser);
-        await syncUserProfile({
+
+        if (setAsAuthenticated) {
+          saveUserSession(newUser);
+        }
+
+        syncUserProfile({
           id: newUser.id,
           email: newUser.email,
           name: newUser.name,
           role: newUser.role,
           photoUrl: newUser.photoUrl,
-        });
+        }).catch((e) => console.warn('Supabase sync note:', e));
+
+        return newUser;
       }
     } catch (e) {
       console.error('Failed to fetch Google profile:', e);
     } finally {
       setIsLoading(false);
     }
+    return null;
   };
 
-  // Check for redirect access_token from Google OAuth callback in URL hash
-  useEffect(() => {
-    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+  const handleOAuthRedirectUrl = async (url: string, setAsAuthenticated: boolean = true): Promise<AppUser | null> => {
+    try {
+      const match = url.match(/access_token=([^&]+)/);
+      if (match && match[1]) {
+        const token = decodeURIComponent(match[1]);
+        return await fetchGoogleUser(token, setAsAuthenticated);
+      }
+    } catch (e) {
+      console.warn('OAuth URL parse error:', e);
+    }
+    return null;
+  };
 
-    if (window.location.hash && window.location.hash.includes('access_token')) {
-      const params = new URLSearchParams(window.location.hash.substring(1));
-      const token = params.get('access_token');
-      if (token) {
-        fetchGoogleUser(token);
-        // Clean URL hash without triggering a full page reload
-        window.history.replaceState(null, '', window.location.pathname);
+  // Check for redirect access_token from Google OAuth callback or Supabase Auth session
+  useEffect(() => {
+    // 1. Supabase OAuth session listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        const u = session.user;
+        const appUser: AppUser = {
+          id: u.id,
+          name: u.user_metadata?.full_name || u.user_metadata?.name || u.email?.split('@')[0] || 'Citizen Responder',
+          email: u.email || '',
+          photoUrl: u.user_metadata?.avatar_url || u.user_metadata?.picture || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+          role: 'user',
+          roleTitle: 'Citizen Responder',
+          onboardingCompleted: true,
+        };
+        saveUserSession(appUser);
+        syncUserProfile({
+          id: appUser.id,
+          email: appUser.email,
+          name: appUser.name,
+          role: appUser.role,
+          photoUrl: appUser.photoUrl,
+        }).catch((e) => console.warn('Supabase sync note:', e));
+      }
+    });
+
+    // 2. Direct Google OAuth 2.0 access_token in URL hash or search on Web
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const fullUrl = window.location.href;
+      if (fullUrl.includes('access_token')) {
+        const wasOnboarding = window.sessionStorage?.getItem('google_auth_for_onboarding') === 'true';
+        try {
+          window.sessionStorage?.removeItem('google_auth_for_onboarding');
+        } catch {}
+
+        handleOAuthRedirectUrl(fullUrl, !wasOnboarding).then((u) => {
+          if (u && wasOnboarding) {
+            try {
+              window.sessionStorage?.setItem('pending_onboarding_google_user', JSON.stringify(u));
+            } catch {}
+          }
+        });
+
+        try {
+          window.history.replaceState(null, '', window.location.pathname);
+        } catch {}
       }
     }
+
+    return () => {
+      subscription?.unsubscribe();
+    };
   }, []);
 
   const loginWithCredentials = async (username: string, password: string): Promise<{ success: boolean; message?: string }> => {
@@ -187,6 +279,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         photoUrl: u.photoUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
         role: u.role,
         roleTitle: ROLE_CONFIGS[u.role].title,
+        onboardingCompleted: true,
       };
       saveUserSession(appUser);
       return { success: true };
@@ -209,6 +302,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         photoUrl: u.photoUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
         role: 'user',
         roleTitle: ROLE_CONFIGS.user.title,
+        onboardingCompleted: true,
       };
       saveUserSession(appUser);
       return { success: true };
@@ -241,22 +335,163 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setGoogleClientIdState(id);
   };
 
-  const signInWithGoogle = async () => {
+  const loginWithGoogleProfile = async (profile: { name: string; email: string; photoUrl?: string }) => {
+    setIsLoading(true);
+    const googleUser: AppUser = {
+      id: `g-${Date.now().toString().slice(-6)}`,
+      name: profile.name || profile.email.split('@')[0],
+      email: profile.email,
+      photoUrl: profile.photoUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+      role: 'user',
+      roleTitle: 'Citizen Responder',
+      givenName: profile.name.split(' ')[0],
+      onboardingCompleted: true,
+    };
+    saveUserSession(googleUser);
+    try {
+      await syncUserProfile({
+        id: googleUser.id,
+        email: googleUser.email,
+        name: googleUser.name,
+        role: googleUser.role,
+        photoUrl: googleUser.photoUrl,
+      });
+    } catch (e) {
+      console.warn('Sync google user profile note:', e);
+    }
+    setIsLoading(false);
+  };
+
+  const signInWithGoogle = async (forOnboarding: boolean = false): Promise<AppUser | null> => {
     setIsLoading(true);
 
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      // Direct Google OAuth 2.0 Browser Redirect to accounts.google.com
-      const redirectUri = window.location.origin;
-      const clientId = googleClientId || DEFAULT_GOOGLE_CLIENT_ID;
+    const redirectUri =
+      Platform.OS === 'web' && typeof window !== 'undefined'
+        ? window.location.origin
+        : Linking.createURL('/');
+
+    const clientId = googleClientId || DEFAULT_GOOGLE_CLIENT_ID;
+
+    // 1. On Web: Use Google Identity Services (GIS) Token Client popup if available
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2) {
+      try {
+        const authedUser = await new Promise<AppUser | null>((resolve) => {
+          try {
+            const tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
+              client_id: clientId,
+              scope: 'openid email profile https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+              callback: async (tokenResponse: any) => {
+                if (tokenResponse?.error) {
+                  console.warn('Google OAuth popup error:', tokenResponse);
+                  setIsLoading(false);
+                  resolve(null);
+                  return;
+                }
+                if (tokenResponse?.access_token) {
+                  const fetched = await fetchGoogleUser(tokenResponse.access_token, !forOnboarding);
+                  resolve(fetched);
+                } else {
+                  setIsLoading(false);
+                  resolve(null);
+                }
+              },
+              error_callback: (err: any) => {
+                console.warn('GIS Token client error:', err);
+                setIsLoading(false);
+                resolve(null);
+              },
+            });
+            tokenClient.requestAccessToken({ prompt: 'select_account' });
+          } catch (initErr) {
+            console.warn('Failed to initialize GIS token client:', initErr);
+            resolve(null);
+          }
+        });
+
+        if (authedUser) {
+          setIsLoading(false);
+          return authedUser;
+        }
+      } catch (gisErr) {
+        console.warn('GIS Token client exception, falling back to direct redirect:', gisErr);
+      }
+    }
+
+    // 2. Direct Official Google OAuth 2.0 (accounts.google.com)
+    // Only redirect if explicit custom client_id is set via EXPO_PUBLIC_GOOGLE_CLIENT_ID
+    if (process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID && process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID !== DEFAULT_GOOGLE_CLIENT_ID) {
       const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
         redirectUri
       )}&response_type=token&scope=openid%20email%20profile&prompt=select_account`;
 
-      // Redirect the entire browser window to Google OAuth page
-      window.location.href = googleAuthUrl;
-      return;
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        try {
+          if (forOnboarding) {
+            window.sessionStorage.setItem('google_auth_for_onboarding', 'true');
+          }
+          window.location.href = googleAuthUrl;
+          return null;
+        } catch (err) {
+          console.warn('Direct Google redirect error:', err);
+        }
+      } else {
+        try {
+          const result = await WebBrowser.openAuthSessionAsync(googleAuthUrl, redirectUri);
+          if (result.type === 'success' && result.url) {
+            const u = await handleOAuthRedirectUrl(result.url, !forOnboarding);
+            setIsLoading(false);
+            return u;
+          }
+        } catch (err) {
+          console.warn('WebBrowser error:', err);
+        }
+      }
     }
 
+    setIsLoading(false);
+    return null;
+  };
+
+  const updateUser = (updates: Partial<AppUser>) => {
+    if (!user) return;
+    const updated = { ...user, ...updates };
+    saveUserSession(updated);
+  };
+
+  const completeOnboarding = async (userData: Partial<AppUser>) => {
+    setIsLoading(true);
+    const id = userData.id || `usr-${Date.now().toString().slice(-6)}`;
+    const role: UserRole = userData.role || 'user';
+    const cleanName = (userData.name || 'Citizen User').trim();
+    const newUser: AppUser = {
+      id,
+      name: cleanName,
+      email: userData.email || `${cleanName.toLowerCase().replace(/\s+/g, '')}@rakshak.in`,
+      photoUrl: userData.photoUrl || '',
+      role,
+      roleTitle: ROLE_CONFIGS[role]?.title || 'Citizen Responder',
+      phone: userData.phone || '',
+      birthdate: userData.birthdate || '',
+      bloodGroup: userData.bloodGroup || '',
+      location: userData.location,
+      emergencyContact: userData.emergencyContact,
+      preferredLanguage: userData.preferredLanguage || 'en',
+      onboardingCompleted: true,
+    };
+
+    saveUserSession(newUser);
+
+    try {
+      await syncUserProfile({
+        id: newUser.id,
+        email: newUser.email,
+        name: newUser.name,
+        role: newUser.role,
+        photoUrl: newUser.photoUrl,
+      });
+    } catch (e) {
+      console.warn('Sync user profile note:', e);
+    }
     setIsLoading(false);
   };
 
@@ -274,9 +509,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated: !!user,
         isLoading,
         signInWithGoogle,
+        loginWithGoogleProfile,
         loginAsRole,
         loginWithCredentials,
         registerNewUser,
+        completeOnboarding,
+        updateUser,
+        saveUserSession,
         signOut,
         googleClientId,
         setGoogleClientId,

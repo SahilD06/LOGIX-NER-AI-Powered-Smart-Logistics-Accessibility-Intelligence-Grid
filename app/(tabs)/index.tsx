@@ -11,15 +11,16 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Header } from '../../components/Header';
-import { RiskGauge } from '../../components/RiskGauge';
 import { InteractiveMap } from '../../components/InteractiveMap';
 import { SOSBanner } from '../../components/SOSBanner';
+import { LogisticsTracker } from '../../components/LogisticsTracker';
 import { fetchLiveTelemetry, fetchNasaEvents, TelemetryData, NasaEvent } from '../../services/api';
 import { calculateRisk, RiskEvaluation } from '../../services/aiEngine';
 import { CONNECTIVITY_STATUS } from '../../services/mockData';
-import { MapPin, Navigation, ChevronLeft, ChevronRight, BarChart3, ArrowRight } from 'lucide-react-native';
+import { MapPin, Navigation, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useAppTheme } from '../../context/ThemeContext';
-import { requestUserLocation, UserLocation } from '../../services/locationService';
+import { requestUserLocationWithChoice, UserLocation, LocationPrecisionMode } from '../../services/locationService';
+import { LocationChoiceModal } from '../../components/LocationChoiceModal';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -30,11 +31,14 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [simulatedDanger, setSimulatedDanger] = useState<boolean>(false);
   const [sosStatus, setSosStatus] = useState<'none' | 'needs_help' | 'safe'>('none');
+  const [locationPrecisionMode, setLocationPrecisionMode] = useState<LocationPrecisionMode>('precise');
+  const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
   const [userLocation, setUserLocation] = useState<UserLocation>({
     latitude: 25.5788,
     longitude: 91.8933,
     locationName: 'East Khasi Hills • Shillong Sector',
     isLiveGps: false,
+    precisionMode: 'precise',
   });
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const corridorScrollRef = useRef<ScrollView>(null);
@@ -81,10 +85,10 @@ export default function DashboardScreen() {
     }
   };
 
-  const autoTrackLocation = async () => {
+  const autoTrackLocation = async (mode: LocationPrecisionMode = locationPrecisionMode) => {
     setIsLocating(true);
     try {
-      const loc = await requestUserLocation();
+      const loc = await requestUserLocationWithChoice(mode);
       setUserLocation(loc);
       await loadData(loc.latitude, loc.longitude);
     } catch (e) {
@@ -95,8 +99,13 @@ export default function DashboardScreen() {
     }
   };
 
+  const handleSelectLocationMode = (mode: LocationPrecisionMode) => {
+    setLocationPrecisionMode(mode);
+    autoTrackLocation(mode);
+  };
+
   useEffect(() => {
-    autoTrackLocation();
+    autoTrackLocation('precise');
   }, []);
 
   const onRefresh = () => {
@@ -119,9 +128,13 @@ export default function DashboardScreen() {
         }
       >
         {/* Quick Location & Status Pill */}
-        <View style={[styles.locationBar, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        <TouchableOpacity
+          style={[styles.locationBar, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+          onPress={() => setShowLocationModal(true)}
+          activeOpacity={0.8}
+        >
           <View style={styles.locationLeft}>
-            <TouchableOpacity
+            <View
               style={[
                 styles.gpsIconBtn,
                 {
@@ -129,16 +142,13 @@ export default function DashboardScreen() {
                   borderColor: userLocation.isLiveGps ? colors.successBorder : colors.border,
                 },
               ]}
-              onPress={autoTrackLocation}
-              disabled={isLocating}
-              activeOpacity={0.7}
             >
               {isLocating ? (
                 <ActivityIndicator size="small" color={colors.steelBlue} />
               ) : (
                 <MapPin size={15} color={userLocation.isLiveGps ? colors.success : colors.steelBlue} />
               )}
-            </TouchableOpacity>
+            </View>
 
             <View style={styles.locationInfoCol}>
               <View style={styles.locationTitleRow}>
@@ -149,13 +159,13 @@ export default function DashboardScreen() {
                   <View style={[styles.liveGpsBadge, { backgroundColor: colors.successBg, borderColor: colors.successBorder }]}>
                     <View style={[styles.liveGpsDot, { backgroundColor: colors.success }]} />
                     <Text style={[styles.liveGpsText, { color: colors.success }]}>
-                      Live GPS {userLocation.accuracy ? `(±${userLocation.accuracy}m)` : ''}
+                      {userLocation.precisionMode === 'approximate' ? 'Approx. District' : 'Live GPS'} {userLocation.accuracy ? `(±${userLocation.accuracy}m)` : ''}
                     </Text>
                   </View>
                 )}
               </View>
               <Text style={[styles.locationCoordsText, { color: colors.textMuted }]}>
-                {userLocation.latitude.toFixed(4)}°N, {userLocation.longitude.toFixed(4)}°E
+                {userLocation.latitude.toFixed(4)}°N, {userLocation.longitude.toFixed(4)}°E • Tap to change mode
               </Text>
             </View>
           </View>
@@ -165,7 +175,7 @@ export default function DashboardScreen() {
               {telemetry?.temperature ?? 22}°C • {telemetry?.humidity ?? 88}% RH
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* SOS Emergency Banner */}
         <SOSBanner
@@ -175,9 +185,6 @@ export default function DashboardScreen() {
           onSimulateDanger={() => setSimulatedDanger(!simulatedDanger)}
           isSimulatedDanger={simulatedDanger}
         />
-
-        {/* AI Susceptibility Gauge */}
-        <RiskGauge risk={risk} telemetry={telemetry} loading={loading} />
 
         {/* Critical Corridors Ticker */}
         <View style={styles.corridorContainer}>
@@ -211,113 +218,70 @@ export default function DashboardScreen() {
             style={styles.corridorScroll}
             contentContainerStyle={styles.corridorScrollContent}
           >
-            {CONNECTIVITY_STATUS.map((item) => (
-              <View key={item.id} style={[styles.corridorCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-                <View style={styles.corridorCardTop}>
-                  <Text style={[styles.corridorRoute, { color: colors.textPrimary }]}>{item.route}</Text>
-                  <View
-                    style={[
-                      styles.statusPill,
-                      {
-                        backgroundColor:
-                          item.status === 'Blocked'
-                            ? colors.dangerBg
-                            : item.status === 'Vulnerable'
-                            ? colors.warningBg
-                            : colors.successBg,
-                        borderColor:
-                          item.status === 'Blocked'
-                            ? colors.dangerBorder
-                            : item.status === 'Vulnerable'
-                            ? colors.warningBorder
-                            : colors.successBorder,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.statusPillText,
-                        {
-                          color:
-                            item.status === 'Blocked'
-                              ? colors.danger
-                              : item.status === 'Vulnerable'
-                              ? colors.warning
-                              : colors.success,
-                        },
-                      ]}
-                    >
-                      {item.status}
-                    </Text>
+            {CONNECTIVITY_STATUS.map((item) => {
+              const isBlocked = item.status === 'Blocked';
+              const isVulnerable = item.status === 'Vulnerable';
+
+              const cardBg = isBlocked ? colors.dangerBg : isVulnerable ? colors.warningBg : colors.successBg;
+              const cardBorder = isBlocked ? colors.dangerBorder : isVulnerable ? colors.warningBorder : colors.successBorder;
+              const statusColor = isBlocked ? colors.danger : isVulnerable ? colors.warning : colors.success;
+
+              return (
+                <View
+                  key={item.id}
+                  style={[
+                    styles.corridorCard,
+                    {
+                      backgroundColor: cardBg,
+                      borderColor: cardBorder,
+                      borderLeftWidth: 4,
+                      borderLeftColor: statusColor,
+                    },
+                  ]}
+                >
+                  <View style={styles.corridorCardTop}>
+                    <Text style={[styles.corridorRoute, { color: colors.textPrimary }]}>{item.route}</Text>
+                    <View style={[styles.statusPill, { backgroundColor: statusColor, borderColor: statusColor }]}>
+                      <Text style={[styles.statusPillText, { color: '#ffffff' }]}>
+                        {item.status.toUpperCase()}
+                      </Text>
+                    </View>
                   </View>
+                  <Text style={[styles.corridorName, { color: colors.textSecondary }]} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.corridorReason,
+                      { color: isBlocked ? colors.danger : colors.textPrimary, fontWeight: isBlocked ? '800' : '600' },
+                    ]}
+                    numberOfLines={2}
+                  >
+                    ⚠️ {item.reason}
+                  </Text>
                 </View>
-                <Text style={[styles.corridorName, { color: colors.textSecondary }]} numberOfLines={1}>
-                  {item.name}
-                </Text>
-                <Text style={[styles.corridorReason, { color: colors.textPrimary }]} numberOfLines={2}>
-                  {item.reason}
-                </Text>
-              </View>
-            ))}
+              );
+            })}
           </ScrollView>
         </View>
 
-        {/* Geotechnical & ML Analytics Hub Preview Banner */}
-        <TouchableOpacity
-          style={[styles.analyticsBanner, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-          onPress={() => router.push('/(tabs)/analytics' as any)}
-          activeOpacity={0.85}
-        >
-          <View style={styles.analyticsBannerHeader}>
-            <View style={styles.analyticsBannerLeft}>
-              <View style={[styles.analyticsIconWrap, { backgroundColor: colors.subPanel, borderColor: colors.steelBlue }]}>
-                <BarChart3 size={20} color={colors.steelBlue} />
-              </View>
-              <View style={styles.analyticsTextWrap}>
-                <View style={styles.analyticsTagRow}>
-                  <View style={[styles.analyticsTag, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]}>
-                    <Text style={[styles.analyticsTagText, { color: colors.danger }]}>ML RESEARCH LAB</Text>
-                  </View>
-                  <Text style={[styles.analyticsDatasetCount, { color: colors.textMuted }]}>2,548 Training Records</Text>
-                </View>
-                <Text style={[styles.analyticsMainTitle, { color: colors.textPrimary }]}>
-                  Geotechnical Analytics & ML Risk Matrix
-                </Text>
-              </View>
-            </View>
-
-            <View style={[styles.analyticsArrowBtn, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
-              <ArrowRight size={16} color={colors.steelBlue} />
-            </View>
-          </View>
-
-          <Text style={[styles.analyticsSummaryText, { color: colors.textSecondary }]}>
-            Explore the multi-dimensional geotechnical charts: Soil Saturation Risk Matrix Heatmap, Precipitation Boxplots, 10-tier Canopy Retention, and What-If Disaster Simulator.
-          </Text>
-
-          <View style={[styles.analyticsQuickStatsRow, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
-            <View style={styles.statMiniItem}>
-              <Text style={[styles.statMiniVal, { color: colors.success }]}>94.2%</Text>
-              <Text style={[styles.statMiniLabel, { color: colors.textMuted }]}>AUC Accuracy</Text>
-            </View>
-            <View style={styles.statMiniItem}>
-              <Text style={[styles.statMiniVal, { color: colors.warning }]}>150 mm</Text>
-              <Text style={[styles.statMiniLabel, { color: colors.textMuted }]}>Trigger Threshold</Text>
-            </View>
-            <View style={styles.statMiniItem}>
-              <Text style={[styles.statMiniVal, { color: colors.danger }]}>&gt;35°</Text>
-              <Text style={[styles.statMiniLabel, { color: colors.textMuted }]}>Failure Slope</Text>
-            </View>
-            <View style={styles.statMiniItem}>
-              <Text style={[styles.statMiniVal, { color: colors.steelBlue }]}>Master</Text>
-              <Text style={[styles.statMiniLabel, { color: colors.textMuted }]}>Analytics Board</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-
         {/* Interactive Spatial GIS Radar */}
-        <InteractiveMap nasaEvents={nasaEvents} />
+        <InteractiveMap nasaEvents={nasaEvents} simulatedDanger={simulatedDanger} />
+
+        {/* AI Smart Logistics & Accessibility Intelligence Tracker */}
+        <LogisticsTracker
+          simulatedDanger={simulatedDanger}
+          onSimulateDanger={() => setSimulatedDanger(!simulatedDanger)}
+        />
       </ScrollView>
+
+      {/* Location Access Choice Modal */}
+      <LocationChoiceModal
+        visible={showLocationModal}
+        onClose={() => setShowLocationModal(false)}
+        onSelectMode={handleSelectLocationMode}
+        currentMode={userLocation.precisionMode || locationPrecisionMode}
+      />
     </View>
   );
 }
@@ -331,7 +295,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 50,
+    paddingBottom: 120,
     maxWidth: 960,
     alignSelf: 'center',
     width: '100%',
@@ -497,94 +461,5 @@ const styles = StyleSheet.create({
   corridorReason: {
     fontSize: 11,
     lineHeight: 16,
-  },
-  analyticsBanner: {
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-    gap: 10,
-  },
-  analyticsBannerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  analyticsBannerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  analyticsIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  analyticsTextWrap: {
-    flex: 1,
-  },
-  analyticsTagRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 2,
-  },
-  analyticsTag: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-  },
-  analyticsTagText: {
-    fontSize: 8,
-    fontWeight: '900',
-  },
-  analyticsDatasetCount: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  analyticsMainTitle: {
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  analyticsArrowBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  analyticsSummaryText: {
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  analyticsQuickStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingVertical: 8,
-  },
-  statMiniItem: {
-    alignItems: 'center',
-  },
-  statMiniVal: {
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  statMiniLabel: {
-    fontSize: 9,
-    fontWeight: '700',
-    marginTop: 1,
   },
 });

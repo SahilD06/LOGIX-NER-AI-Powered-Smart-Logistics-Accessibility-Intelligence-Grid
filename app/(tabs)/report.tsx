@@ -127,6 +127,11 @@ export default function FieldReportScreen() {
     };
   }, []);
 
+  // Auto-detect GPS on screen load
+  useEffect(() => {
+    handleDetectGPS();
+  }, []);
+
   // Detect live device GPS
   const handleDetectGPS = () => {
     setIsDetectingGps(true);
@@ -243,8 +248,13 @@ export default function FieldReportScreen() {
 
       if (result.isLandslideHazard && result.isAuthentic) {
         setImageState('verified');
+        // AI Auto-detect Hazard Classification
         if (result.suggestedHazardType) {
           setIncidentType(result.suggestedHazardType);
+        }
+        // AI Auto-detect Severity Level
+        if (result.suggestedSeverity) {
+          setSeverity(result.suggestedSeverity);
         }
       } else {
         setImageState('rejected');
@@ -336,43 +346,6 @@ export default function FieldReportScreen() {
           </View>
         ) : (
           <View style={[styles.formCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-            {/* GPS Location Tag with Detect button */}
-            <View style={styles.inputGroup}>
-              <View style={styles.labelRow}>
-                <Text style={[styles.label, { color: colors.textPrimary }]}>Location / Landmark</Text>
-                <TouchableOpacity
-                  style={[styles.detectGpsBtn, { backgroundColor: colors.subPanel, borderColor: colors.border }]}
-                  onPress={handleDetectGPS}
-                  disabled={isDetectingGps}
-                  activeOpacity={0.75}
-                >
-                  {isDetectingGps ? (
-                    <ActivityIndicator size="small" color={colors.steelBlue} />
-                  ) : (
-                    <>
-                      <Crosshair size={13} color={colors.steelBlue} />
-                      <Text style={[styles.detectGpsText, { color: colors.steelBlue }]}>Detect My GPS</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
-
-              <View style={[styles.inputWithIcon, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
-                <MapPin size={20} color={colors.steelBlue} />
-                <TextInput
-                  style={[styles.textInput, { color: colors.textPrimary }]}
-                  value={locationName}
-                  onChangeText={setLocationName}
-                  placeholder="Enter location or road stretch"
-                  placeholderTextColor={colors.textMuted}
-                />
-              </View>
-              <Text style={[styles.hint, { color: colors.textMuted }]}>
-                📍 Validated Geotag: [{gpsCoords?.lat ?? 25.5788}° N, {gpsCoords?.lng ?? 91.8933}° E]
-                {gpsCoords?.accuracy ? ` • Accuracy ±${gpsCoords.accuracy}m` : ''}
-              </Text>
-            </View>
-
             {/* Incident Type Selector */}
             <View style={styles.inputGroup}>
               <Text style={[styles.label, { color: colors.textPrimary }]}>Hazard Classification</Text>
@@ -467,7 +440,7 @@ export default function FieldReportScreen() {
                     </View>
                     <Text style={[styles.uploadTriggerTitle, { color: colors.textPrimary }]}>Hazard Ground Photo Capture</Text>
                     <Text style={[styles.uploadTriggerSub, { color: colors.textMuted }]}>
-                      ⚡ Snap a live ground photo using your smartphone camera or upload field evidence with GPS geotagging.
+                      Snap a live ground photo using your smartphone camera or upload field evidence with GPS geotagging.
                     </Text>
 
                     <View style={{ flexDirection: 'row', gap: 10, marginTop: 14, flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
@@ -491,7 +464,7 @@ export default function FieldReportScreen() {
                           }}
                         >
                           <Camera size={18} color="#ffffff" />
-                          <span>📸 Take Live Photo (Phone Camera)</span>
+                          <span>Take Live Photo (Phone Camera)</span>
                           <input
                             type="file"
                             accept="image/*"
@@ -799,7 +772,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 50,
+    paddingBottom: 120,
     maxWidth: 960,
     alignSelf: 'center',
     width: '100%',
@@ -843,19 +816,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  detectGpsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  detectGpsText: {
-    fontSize: 11,
-    fontWeight: '800',
   },
   hint: {
     fontSize: 10,

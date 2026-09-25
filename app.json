@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "RAKSHAK NER Landslide Early Warning",
-    "slug": "rakshak-landslide-detection",
+    "name": "LOGIX-NER — AI Smart Logistics & Accessibility Grid",
+    "slug": "logix-ner",
     "version": "1.0.0",
-    "scheme": "rakshak",
+    "scheme": "logix",
     "userInterfaceStyle": "automatic",
     "web": {
       "bundler": "metro",

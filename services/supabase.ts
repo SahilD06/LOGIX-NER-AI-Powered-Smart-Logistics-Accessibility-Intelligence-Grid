@@ -18,6 +18,13 @@ export interface UserProfile {
   name: string;
   role: UserRole;
   photoUrl?: string;
+  phone?: string;
+  birthdate?: string;
+  bloodGroup?: string;
+  locationName?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
   createdAt?: string;
 }
 

@@ -47,13 +47,26 @@ import {
   FlaskConical,
   Radio,
   FileCheck,
-  MapPin,
-  RefreshCw,
-  AlertTriangle,
   Lock,
   ArrowRight,
   UserCheck,
+  Users,
+  Plus,
+  Trash2,
+  Send,
+  RefreshCw,
+  AlertTriangle,
+  Calendar,
+  Droplet,
+  MapPin,
 } from 'lucide-react-native';
+import {
+  getSavedEmergencyContacts,
+  addEmergencyContact,
+  deleteEmergencyContact,
+  broadcastSOSLocationToEmergencyContacts,
+  EmergencyContactPerson,
+} from '../../services/emergencyContactsService';
 
 export default function SettingsScreen() {
   const { theme, colors, isDark } = useAppTheme();
@@ -72,6 +85,38 @@ export default function SettingsScreen() {
   const [vibrationAlerts, setVibrationAlerts] = useState(true);
   const [offlineCache, setOfflineCache] = useState(true);
   const [notifFeedback, setNotifFeedback] = useState('');
+
+  // Emergency Contacts state (Max 3 contacts)
+  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContactPerson[]>([]);
+  const [newContactName, setNewContactName] = useState('');
+  const [newContactPhone, setNewContactPhone] = useState('');
+  const [newContactRelation, setNewContactRelation] = useState('Family');
+  const [contactFeedback, setContactFeedback] = useState('');
+
+  useEffect(() => {
+    setEmergencyContacts(getSavedEmergencyContacts());
+  }, []);
+
+  const handleAddContact = () => {
+    setContactFeedback('');
+    const res = addEmergencyContact(newContactName, newContactPhone, newContactRelation);
+    if (res.success) {
+      setEmergencyContacts(res.contacts);
+      setNewContactName('');
+      setNewContactPhone('');
+      setContactFeedback(res.message);
+    } else {
+      setContactFeedback(`⚠️ ${res.message}`);
+    }
+    setTimeout(() => setContactFeedback(''), 4000);
+  };
+
+  const handleDeleteContact = (id: string) => {
+    const updated = deleteEmergencyContact(id);
+    setEmergencyContacts(updated);
+    setContactFeedback('✓ Contact removed.');
+    setTimeout(() => setContactFeedback(''), 3000);
+  };
 
   // Authentication states
   const [isAuthMode, setIsAuthMode] = useState(false);
@@ -341,10 +386,42 @@ export default function SettingsScreen() {
                   </View>
                 </View>
                 <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>{user?.email}</Text>
+                {user?.phone ? (
+                  <Text style={[styles.profileRoleTitle, { color: colors.textSecondary }]}>📞 {user.phone}</Text>
+                ) : null}
+                <View style={styles.profileDetailsRow}>
+                  {user?.birthdate ? (
+                    <View style={[styles.profileMiniBadge, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
+                      <Calendar size={11} color={colors.steelBlue} />
+                      <Text style={[styles.profileMiniText, { color: colors.textPrimary }]}>DOB: {user.birthdate}</Text>
+                    </View>
+                  ) : null}
+                  {user?.bloodGroup ? (
+                    <View style={[styles.profileMiniBadge, { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)' }]}>
+                      <Droplet size={11} color="#EF4444" />
+                      <Text style={[styles.profileMiniText, { color: '#EF4444' }]}>Blood: {user.bloodGroup}</Text>
+                    </View>
+                  ) : null}
+                  {user?.location?.locationName ? (
+                    <View style={[styles.profileMiniBadge, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
+                      <MapPin size={11} color={colors.steelBlue} />
+                      <Text style={[styles.profileMiniText, { color: colors.textPrimary }]} numberOfLines={1}>{user.location.locationName}</Text>
+                    </View>
+                  ) : null}
+                </View>
                 <Text style={[styles.profileRoleTitle, { color: colors.textMuted }]}>{user?.roleTitle}</Text>
               </View>
 
               <View style={styles.profileActions}>
+                <TouchableOpacity
+                  style={[styles.switchAccountBtn, { backgroundColor: colors.subPanel, borderColor: colors.border }]}
+                  onPress={() => signOut()}
+                  activeOpacity={0.8}
+                >
+                  <Sparkles size={13} color={colors.steelBlue} />
+                  <Text style={[styles.switchAccountText, { color: colors.steelBlue }]}>Re-run Onboarding</Text>
+                </TouchableOpacity>
+
                 <TouchableOpacity
                   style={[styles.switchAccountBtn, { backgroundColor: colors.subPanel, borderColor: colors.border }]}
                   onPress={() => setIsAuthMode(true)}
@@ -543,7 +620,126 @@ export default function SettingsScreen() {
           </View>
         )}
 
-        {/* 4. Theme Mode Switcher */}
+        {/* 4. EMERGENCY CONTACTS SECTION (Up to 3 Contacts) */}
+        <View style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.dangerBorder }]}>
+          <View style={styles.cardHeader}>
+            <View style={[styles.cardHeaderIcon, { backgroundColor: colors.dangerBg }]}>
+              <Users size={18} color={colors.danger} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Emergency Contacts (Friends & Family)</Text>
+                <View style={[styles.contactCountBadge, { backgroundColor: emergencyContacts.length >= 3 ? colors.dangerBg : colors.subPanel, borderColor: emergencyContacts.length >= 3 ? colors.dangerBorder : colors.border }]}>
+                  <Text style={[styles.contactCountText, { color: emergencyContacts.length >= 3 ? colors.danger : colors.steelBlue }]}>
+                    {emergencyContacts.length} / 3 Saved
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.cardSubtitle, { color: colors.textMuted }]}>
+                Add up to 3 trusted people. When SOS is triggered, your live GPS location is automatically sent to them via SMS.
+              </Text>
+            </View>
+          </View>
+
+          {/* Add Contact Form */}
+          {emergencyContacts.length < 3 ? (
+            <View style={[styles.addContactBox, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
+              <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>Add Emergency Contact (Max 3)</Text>
+              <View style={styles.contactFormRow}>
+                <TextInput
+                  style={[styles.inputBox, { flex: 1, backgroundColor: colors.cardBg, color: colors.textPrimary, borderColor: colors.border }]}
+                  placeholder="Name (e.g. Mom)"
+                  placeholderTextColor={colors.textMuted}
+                  value={newContactName}
+                  onChangeText={setNewContactName}
+                />
+                <TextInput
+                  style={[styles.inputBox, { flex: 1, backgroundColor: colors.cardBg, color: colors.textPrimary, borderColor: colors.border }]}
+                  placeholder="Phone (+91 98765...)"
+                  placeholderTextColor={colors.textMuted}
+                  value={newContactPhone}
+                  onChangeText={setNewContactPhone}
+                  keyboardType="phone-pad"
+                />
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 8 }}>
+                <TextInput
+                  style={[styles.inputBox, { flex: 1, backgroundColor: colors.cardBg, color: colors.textPrimary, borderColor: colors.border }]}
+                  placeholder="Relation (e.g. Family/Friend)"
+                  placeholderTextColor={colors.textMuted}
+                  value={newContactRelation}
+                  onChangeText={setNewContactRelation}
+                />
+                <TouchableOpacity
+                  style={[styles.addContactBtn, { backgroundColor: colors.steelBlue }]}
+                  onPress={handleAddContact}
+                  activeOpacity={0.8}
+                >
+                  <Plus size={16} color="#ffffff" />
+                  <Text style={styles.addContactBtnText}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <View style={[styles.limitReachedNotice, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
+              <Text style={[styles.limitNoticeText, { color: colors.textSecondary }]}>
+                ✓ 3 Emergency Contacts saved (maximum limit reached). Delete an existing contact below if you wish to add a new person.
+              </Text>
+            </View>
+          )}
+
+          {contactFeedback ? (
+            <Text style={[styles.contactFeedbackText, { color: contactFeedback.includes('⚠️') ? colors.warning : colors.success }]}>
+              {contactFeedback}
+            </Text>
+          ) : null}
+
+          {/* Contact List */}
+          <View style={styles.contactList}>
+            {emergencyContacts.map((contact) => (
+              <View key={contact.id} style={[styles.contactItem, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
+                <View style={styles.contactItemLeft}>
+                  <View style={[styles.contactAvatar, { backgroundColor: colors.dangerBg }]}>
+                    <Users size={16} color={colors.danger} />
+                  </View>
+                  <View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[styles.contactItemName, { color: colors.textPrimary }]}>{contact.name}</Text>
+                      <View style={[styles.relationTag, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+                        <Text style={[styles.relationText, { color: colors.steelBlue }]}>{contact.relation}</Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.contactItemPhone, { color: colors.textSecondary }]}>📞 {contact.phone}</Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.deleteContactBtn, { backgroundColor: colors.cardBg, borderColor: colors.dangerBorder }]}
+                  onPress={() => handleDeleteContact(contact.id)}
+                  activeOpacity={0.8}
+                >
+                  <Trash2 size={14} color={colors.danger} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+
+          {/* Test Broadcast Button */}
+          {emergencyContacts.length > 0 && (
+            <TouchableOpacity
+              style={[styles.testSmsBroadcastBtn, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]}
+              onPress={() => broadcastSOSLocationToEmergencyContacts()}
+              activeOpacity={0.85}
+            >
+              <Send size={14} color={colors.danger} />
+              <Text style={[styles.testSmsBroadcastText, { color: colors.danger }]}>
+                Test Location SMS Broadcast to Saved Contacts ({emergencyContacts.length}) 📱
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* 5. Theme Mode Switcher */}
         <View style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.cardHeader}>
             <View style={[styles.cardHeaderIcon, { backgroundColor: colors.subPanel }]}>
@@ -574,41 +770,9 @@ export default function SettingsScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Disaster System Preferences</Text>
               <Text style={[styles.cardSubtitle, { color: colors.textMuted }]}>
-                PWA Web Audio, Push Notification & Offline Storage Controls
+                Push Notification & Offline Storage Controls
               </Text>
             </View>
-          </View>
-
-          {/* Emergency Audio Siren */}
-          <View style={styles.settingRow}>
-            <View style={styles.settingTextCol}>
-              <View style={styles.settingTitleRow}>
-                <Volume2 size={15} color={soundAlerts ? colors.danger : colors.textPrimary} />
-                <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Emergency Audio Siren</Text>
-              </View>
-              <Text style={[styles.settingDesc, { color: colors.textSecondary }]}>
-                Web Audio synthesized acoustic alarm when Red Alert landslide threshold is triggered.
-              </Text>
-              {soundAlerts && (
-                <TouchableOpacity
-                  style={[styles.testSirenBtn, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]}
-                  onPress={() => playEmergencySiren(2000)}
-                  activeOpacity={0.7}
-                >
-                  <Volume2 size={12} color={colors.danger} />
-                  <Text style={[styles.testSirenText, { color: colors.danger }]}>Test Audio Siren (2s)</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            <Switch
-              value={soundAlerts}
-              onValueChange={(val) => {
-                setSoundAlerts(val);
-                if (val) playEmergencySiren(1500);
-              }}
-              trackColor={{ false: colors.border, true: colors.danger }}
-              thumbColor="#ffffff"
-            />
           </View>
 
           {/* Push Notifications */}
@@ -734,7 +898,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 60,
+    paddingBottom: 120,
     maxWidth: 900,
     alignSelf: 'center',
     width: '100%',
@@ -951,6 +1115,26 @@ const styles = StyleSheet.create({
   profileRoleTitle: {
     fontSize: 11,
     marginTop: 1,
+  },
+  profileDetailsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  profileMiniBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  profileMiniText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   profileActions: {
     flexDirection: 'row',
@@ -1268,5 +1452,121 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 11,
     textAlign: 'center',
+  },
+  contactCountBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  contactCountText: {
+    fontSize: 10,
+    fontWeight: '900',
+  },
+  addContactBox: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+    gap: 6,
+  },
+  contactFormRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 4,
+  },
+  addContactBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  addContactBtnText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  limitReachedNotice: {
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  limitNoticeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 16,
+  },
+  contactFeedbackText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  contactList: {
+    gap: 8,
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  contactItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  contactAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  contactItemName: {
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  relationTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  relationText: {
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  contactItemPhone: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  deleteContactBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  testSmsBroadcastBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 8,
+    marginTop: 12,
+  },
+  testSmsBroadcastText: {
+    fontSize: 12,
+    fontWeight: '900',
   },
 });

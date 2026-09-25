@@ -26,6 +26,7 @@ export const ThemeToggleSwitch: React.FC<ThemeToggleSwitchProps> = ({ scale = 1 
           className="uiverse-input"
           checked={isDark}
           onChange={toggleTheme}
+          style={{ display: 'none' }}
         />
         <span className="uiverse-slider">
           <span className="uiverse-sun">

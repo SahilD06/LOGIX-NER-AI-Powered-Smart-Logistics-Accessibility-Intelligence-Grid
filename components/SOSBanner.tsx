@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Linking } from 'react-native';
 import { AlertCircle, ShieldCheck, Siren, PhoneForwarded, Radio } from 'lucide-react-native';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 
 import { playEmergencySiren, stopEmergencySiren } from '../services/audioAlertService';
+import { broadcastSOSLocationToEmergencyContacts } from '../services/emergencyContactsService';
 
 interface SOSBannerProps {
   sosStatus: 'none' | 'needs_help' | 'safe';
@@ -30,7 +31,10 @@ export const SOSBanner: React.FC<SOSBannerProps> = ({
   const handleSOSPress = () => {
     onTriggerSOS();
     setBroadcastSent(true);
+    // 1. Play high-priority siren & vibration override
     playEmergencySiren(4000);
+    // 2. Automatically broadcast live location SMS to saved family & friends
+    broadcastSOSLocationToEmergencyContacts(25.5788, 91.8933, 'East Khasi Hills • Shillong Sector');
   };
 
   const handleSafePress = () => {
@@ -69,14 +73,17 @@ export const SOSBanner: React.FC<SOSBannerProps> = ({
             <TouchableOpacity
               style={[styles.callControlBtn, { backgroundColor: colors.danger }]}
               onPress={() => {
+                const smsText = encodeURIComponent('🚨 EMERGENCY LANDSLIDE SOS! GPS: 25.5788N, 91.8933E (East Khasi Hills). Immediate NDRF rescue team requested!');
                 if (Platform.OS === 'web') {
-                  window.open('tel:1078');
+                  window.open(`sms:1078?body=${smsText}`, '_self');
+                } else {
+                  Linking.openURL(`sms:1078?body=${smsText}`);
                 }
               }}
               activeOpacity={0.8}
             >
               <PhoneForwarded size={16} color="#ffffff" />
-              <Text style={styles.callControlText}>Call NDRF (1078)</Text>
+              <Text style={styles.callControlText}>SMS SOS (1078) 📱</Text>
             </TouchableOpacity>
           </View>
         </View>

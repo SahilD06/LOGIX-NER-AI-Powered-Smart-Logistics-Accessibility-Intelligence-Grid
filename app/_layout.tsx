@@ -3,9 +3,11 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from '../context/ThemeContext';
-import { AuthProvider } from '../context/AuthContext';
+import { AuthProvider, useAuth } from '../context/AuthContext';
 import { GeminiChatbot } from '../components/GeminiChatbot';
+import { LoginOnboardingScreen } from '../components/LoginOnboardingScreen';
 
 export {
   ErrorBoundary,
@@ -16,6 +18,26 @@ export const unstable_settings = {
 };
 
 SplashScreen.preventAutoHideAsync();
+
+function AppNavigation() {
+  const { isAuthenticated, user } = useAuth();
+
+  const needsOnboarding = !isAuthenticated || (user && user.onboardingCompleted === false);
+
+  if (needsOnboarding) {
+    return <LoginOnboardingScreen />;
+  }
+
+  return (
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+      </Stack>
+      <GeminiChatbot />
+    </>
+  );
+}
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -37,14 +59,13 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <ThemeProvider>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-        </Stack>
-        <GeminiChatbot />
-      </ThemeProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <ThemeProvider>
+          <AppNavigation />
+        </ThemeProvider>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
+

@@ -20,7 +20,7 @@ export const RiskGauge: React.FC<RiskGaugeProps> = ({ risk, telemetry, loading }
         <View style={styles.topRow}>
           <View style={styles.titleWithIcon}>
             <AlertTriangle size={22} color={risk.color} />
-            <Text style={[styles.cardHeader, { color: colors.textSecondary }]}>AI SUSCEPTIBILITY INDEX</Text>
+            <Text style={[styles.cardHeader, { color: colors.textSecondary }]}>SLOPE SAFETY & HAZARD LEVEL</Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: risk.bgColor, borderColor: risk.badgeBorder }]}>
             <Text style={[styles.statusBadgeText, { color: risk.color }]}>{risk.level.toUpperCase()}</Text>
@@ -31,7 +31,7 @@ export const RiskGauge: React.FC<RiskGaugeProps> = ({ risk, telemetry, loading }
           <Text style={[styles.scoreValue, { color: risk.color }]}>{risk.score}</Text>
           <Text style={[styles.scoreMax, { color: colors.textMuted }]}>/100</Text>
           <View style={styles.probabilityWrapper}>
-            <Text style={[styles.probabilityLabel, { color: colors.textSecondary }]}>Failure Probability</Text>
+            <Text style={[styles.probabilityLabel, { color: colors.textSecondary }]}>Estimated Slope Risk</Text>
             <Text style={[styles.probabilityValue, { color: risk.color }]}>{risk.probabilityPercent}%</Text>
           </View>
         </View>

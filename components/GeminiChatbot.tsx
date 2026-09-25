@@ -22,9 +22,15 @@ import {
   HelpCircle,
   PhoneCall,
   Navigation,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
 } from 'lucide-react-native';
 import { useAppTheme } from '../context/ThemeContext';
 import { askGeminiChatbot, ChatMessage } from '../services/geminiService';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getSelectedLanguage, SUPPORTED_LANGUAGES } from '../services/languageService';
 
 const SUGGESTED_QUESTIONS = [
   { label: '🚨 Helplines', query: 'What are the emergency contact numbers for landslide response?' },
@@ -34,16 +40,24 @@ const SUGGESTED_QUESTIONS = [
 ];
 
 export function GeminiChatbot() {
+  const insets = useSafeAreaInsets();
   const { colors, isDark } = useAppTheme();
+  const bottomOffset = Math.max(insets.bottom, Platform.OS === 'android' ? 14 : 10) + 84;
   const [isOpen, setIsOpen] = useState(false);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isVoiceListening, setIsVoiceListening] = useState(false);
+  const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
+
+  const activeLangCode = getSelectedLanguage();
+  const activeLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === activeLangCode) || SUPPORTED_LANGUAGES[0];
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
       role: 'assistant',
       content:
-        "👋 **Welcome to GeoShield AI!**\n\nI'm your 24/7 geotechnical safety assistant powered by Google Gemini. Ask me about **highway status (NH-10, NH-58)**, **disaster protocols**, **NDRF helplines**, or **landslide early warnings**.",
+        `👋 **Welcome to LOGIX AI!**\n\nI'm your 24/7 smart logistics & transport accessibility assistant powered by Google Gemini. (Speaking in **${activeLangObj.name}**). Ask me about **highway status (NH-10, NH-6, NH-58)**, **disaster supply convoys**, **NDRF helplines**, or **landslide road disruptions**.`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -57,6 +71,76 @@ export function GeminiChatbot() {
       }, 150);
     }
   }, [isOpen, messages]);
+
+  const handleVoiceListen = () => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert(`Voice speech recognition is not supported on this browser. Please type your query in ${activeLangObj.name}.`);
+      return;
+    }
+
+    if (isVoiceListening) {
+      setIsVoiceListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = activeLangObj.locale || 'en-US';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        setIsVoiceListening(true);
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0]?.transcript;
+        setIsVoiceListening(false);
+        if (transcript) {
+          setInputMessage(transcript);
+          handleSendMessage(transcript);
+        }
+      };
+
+      recognition.onerror = () => {
+        setIsVoiceListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsVoiceListening(false);
+      };
+
+      recognition.start();
+    } catch (e) {
+      console.warn('Speech recognition error:', e);
+      setIsVoiceListening(false);
+    }
+  };
+
+  const handleSpeakMessage = (msgId: string, text: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+
+    if (speakingMsgId === msgId) {
+      window.speechSynthesis.cancel();
+      setSpeakingMsgId(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const cleanText = text.replace(/[*_#`~]/g, '');
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.lang = activeLangObj.locale || 'en-US';
+    utterance.rate = 0.95;
+
+    utterance.onend = () => setSpeakingMsgId(null);
+    utterance.onerror = () => setSpeakingMsgId(null);
+
+    setSpeakingMsgId(msgId);
+    window.speechSynthesis.speak(utterance);
+  };
 
   const handleSendMessage = async (customText?: string) => {
     const textToSend = (customText || inputMessage).trim();
@@ -118,7 +202,7 @@ export function GeminiChatbot() {
   };
 
   return (
-    <View style={styles.floatingContainer} pointerEvents="box-none">
+    <View style={[styles.floatingContainer, { bottom: bottomOffset }]} pointerEvents="box-none">
       {/* 1. Chat Window Modal */}
       {isOpen && (
         <View
@@ -144,7 +228,7 @@ export function GeminiChatbot() {
               </View>
               <View>
                 <View style={styles.titleRow}>
-                  <Text style={[styles.chatTitle, { color: colors.textPrimary }]}>GeoShield AI</Text>
+                  <Text style={[styles.chatTitle, { color: colors.textPrimary }]}>LOGIX AI</Text>
                   <View style={styles.onlineDot} />
                 </View>
                 <Text style={[styles.chatSubtitle, { color: colors.textMuted }]}>Gemini Flash Intelligence</Text>
@@ -236,14 +320,28 @@ export function GeminiChatbot() {
                     >
                       {msg.content}
                     </Text>
-                    <Text
-                      style={[
-                        styles.timestampText,
-                        { color: isUser ? 'rgba(255,255,255,0.7)' : colors.textMuted },
-                      ]}
-                    >
-                      {msg.timestamp}
-                    </Text>
+                    <View style={styles.msgFooterRow}>
+                      {!isUser && (
+                        <TouchableOpacity
+                          onPress={() => handleSpeakMessage(msg.id, msg.content)}
+                          style={styles.speakerBtn}
+                        >
+                          {speakingMsgId === msg.id ? (
+                            <VolumeX size={13} color={colors.steelBlue} />
+                          ) : (
+                            <Volume2 size={13} color={colors.textMuted} />
+                          )}
+                        </TouchableOpacity>
+                      )}
+                      <Text
+                        style={[
+                          styles.timestampText,
+                          { color: isUser ? 'rgba(255,255,255,0.7)' : colors.textMuted },
+                        ]}
+                      >
+                        {msg.timestamp}
+                      </Text>
+                    </View>
                   </View>
                 </View>
               );
@@ -278,6 +376,25 @@ export function GeminiChatbot() {
 
           {/* Input Bar */}
           <View style={[styles.inputBar, { borderTopColor: isDark ? '#2D3B4E' : '#E2E8F0', backgroundColor: isDark ? '#171E2B' : '#FFFFFF' }]}>
+            {/* Regional Voice Mic Button */}
+            <TouchableOpacity
+              style={[
+                styles.voiceMicBtn,
+                {
+                  backgroundColor: isVoiceListening ? colors.dangerBg : isDark ? '#0F172A' : '#F1F5F9',
+                  borderColor: isVoiceListening ? colors.dangerBorder : isDark ? '#334155' : '#CBD5E1',
+                },
+              ]}
+              onPress={handleVoiceListen}
+              activeOpacity={0.8}
+            >
+              {isVoiceListening ? (
+                <Mic size={16} color={colors.danger} />
+              ) : (
+                <MicOff size={16} color={colors.steelBlue} />
+              )}
+            </TouchableOpacity>
+
             <TextInput
               style={[
                 styles.textInput,
@@ -287,7 +404,7 @@ export function GeminiChatbot() {
                   borderColor: isDark ? '#334155' : '#CBD5E1',
                 },
               ]}
-              placeholder="Ask GeoShield AI (e.g. NH-10 alerts)..."
+              placeholder={`Ask GeoShield AI in ${activeLangObj.name}...`}
               placeholderTextColor={colors.textMuted}
               value={inputMessage}
               onChangeText={setInputMessage}
@@ -346,15 +463,14 @@ export function GeminiChatbot() {
 const styles = StyleSheet.create({
   floatingContainer: {
     position: 'absolute',
-    bottom: 24,
-    right: 24,
+    right: 18,
     zIndex: 9999,
     alignItems: 'flex-end',
   },
   fabButton: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 8,
@@ -500,9 +616,17 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     lineHeight: 19,
   },
+  msgFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  speakerBtn: {
+    padding: 2,
+  },
   timestampText: {
     fontSize: 10,
-    marginTop: 4,
     alignSelf: 'flex-end',
   },
   thinkingText: {
@@ -516,6 +640,14 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderTopWidth: 1,
     gap: 8,
+  },
+  voiceMicBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   textInput: {
     flex: 1,

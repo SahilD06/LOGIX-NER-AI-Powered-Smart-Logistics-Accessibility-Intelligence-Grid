@@ -1,19 +1,15 @@
 <div align="center">
 
-# 🛡️ RAKSHAK NER
-### Landslide Early Warning, Geotechnical ML Analytics & AI Disaster Shield
+# 🚚 LOGIX-NER
+### AI-Powered Smart Logistics & Accessibility Intelligence Grid for North-East India
 
-[![Live Deployment](https://img.shields.io/badge/Live_App-rakshak--livid.vercel.app-blueviolet?style=for-the-badge&logo=vercel)](https://rakshak-livid.vercel.app/)
-[![Analytics Hub](https://img.shields.io/badge/Analytics_Hub-/analytics-0070f3?style=for-the-badge&logo=tableau)](https://rakshak-livid.vercel.app/analytics)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
-[![React 19](https://img.shields.io/badge/React-19.2-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
+[![Expo 57](https://img.shields.io/badge/Expo-57.0-000000?style=for-the-badge&logo=expo)](https://expo.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 [![Google Gemini 2.5](https://img.shields.io/badge/Google_Gemini-2.5_Flash-8E44AD?style=for-the-badge&logo=google)](https://deepmind.google/technologies/gemini/)
 [![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=for-the-badge&logo=supabase)](https://supabase.com/)
 
-**Rakshak NER** is a next-generation Progressive Web Application (PWA) and Geo-Spatial Disaster Intelligence System engineered specifically for early landslide detection, real-time weather/soil telemetry monitoring, geotagged incident reporting, and NDRF emergency response coordination across the vulnerable North Eastern Region (NER) of India.
-
-[🌐 Launch Live Web App](https://rakshak-livid.vercel.app/) • [📊 Explore Analytics Hub](https://rakshak-livid.vercel.app/analytics) • [📖 View Research References](#-research--official-references)
+**LOGIX-NER** is a next-generation AI-enabled logistics intelligence and transport accessibility platform engineered specifically to solve the Smart India Hackathon (SIH) problem statement for the North Eastern Region (NER) of India. It provides real-time essential supply convoy tracking, district connectivity matrix, AI alternate bypass route optimization, ISRO Bhuvan GIS radar, Hugging Face vision hazard verification, and 11 regional language voice assistance.
 
 </div>
 

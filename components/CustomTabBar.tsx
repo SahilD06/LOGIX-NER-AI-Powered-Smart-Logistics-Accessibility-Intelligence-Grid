@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 
 export interface CustomTabBarProps {
   state: {
@@ -33,6 +34,7 @@ export interface CustomTabBarProps {
 export function CustomTabBar({ state, descriptors, navigation }: CustomTabBarProps) {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useAppTheme();
+  const { t } = useLanguage();
 
   // Elevate navbar above device system navigation bar
   const bottomMargin = Math.max(insets.bottom, Platform.OS === 'android' ? 14 : 10) + 6;
@@ -63,11 +65,22 @@ export function CustomTabBar({ state, descriptors, navigation }: CustomTabBarPro
           const isFocused = state.index === index;
 
           const label =
-            options.tabBarLabel !== undefined
+            route.name === 'index'
+              ? t.dashboard
+              : route.name === 'alerts'
+              ? t.alerts
+              : route.name === 'report'
+              ? t.report
+              : route.name === 'sensors'
+              ? t.sensors
+              : route.name === 'settings'
+              ? t.settings
+              : options.tabBarLabel !== undefined
               ? options.tabBarLabel
               : options.title !== undefined
               ? options.title
               : route.name;
+
 
           const onPress = () => {
             const event = navigation.emit({

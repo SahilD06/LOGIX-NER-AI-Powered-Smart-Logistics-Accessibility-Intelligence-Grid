@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Platform, Linking } from 'rea
 import { AlertCircle, ShieldCheck, Siren, PhoneForwarded, Radio } from 'lucide-react-native';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 
 import { playEmergencySiren, stopEmergencySiren } from '../services/audioAlertService';
 import { broadcastSOSLocationToEmergencyContacts } from '../services/emergencyContactsService';
@@ -24,7 +25,9 @@ export const SOSBanner: React.FC<SOSBannerProps> = ({
 }) => {
   const { colors, isDark } = useAppTheme();
   const { currentRole } = useAuth();
+  const { t } = useLanguage();
   const [broadcastSent, setBroadcastSent] = useState(false);
+
 
   const isTester = currentRole === 'tester';
 
@@ -109,7 +112,7 @@ export const SOSBanner: React.FC<SOSBannerProps> = ({
             activeOpacity={0.85}
           >
             <AlertCircle size={22} color="#ffffff" />
-            <Text style={styles.sosButtonText}>SOS EMERGENCY</Text>
+            <Text style={styles.sosButtonText}>{t.sosEmergency}</Text>
           </TouchableOpacity>
 
           {/* Simulate Risk is only visible to QA Tester */}

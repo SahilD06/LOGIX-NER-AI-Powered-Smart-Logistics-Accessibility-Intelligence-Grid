@@ -1,16 +1,15 @@
 /**
  * Voice AI Command & Regional Panic Phrase Recognition Service
  * Understands emergency voice commands and distress words spoken in ALL 11 Seven Sister languages.
- * Combines Web Speech API + HTML5 MediaRecorder + Gemini Multimodal Voice for 100% offline & online reliability.
+ * Includes Text-to-Speech (TTS) speech synthesis localized to the selected language.
  */
 import { playEmergencySiren, playWarningBeep } from './audioAlertService';
 import { broadcastSOSLocationToEmergencyContacts } from './emergencyContactsService';
-import { LanguageCode, getSelectedLanguage } from './languageService';
-import { processVoiceAudioWithGemini } from './geminiService';
+import { LanguageCode, getSelectedLanguage, getTranslations } from './languageService';
 
 export interface VoiceRecognitionResult {
   isPanicCommand: boolean;
-  actionType: 'SOS' | 'ALERTS' | 'HELPLINES' | 'SHELTERS' | 'WEATHER' | 'ROUTES' | 'UNKNOWN';
+  actionType: 'SOS' | 'ALERTS' | 'HELPLINES' | 'SHELTERS' | 'WEATHER' | 'ROUTES' | 'MEDICAL' | 'UNKNOWN';
   spokenText: string;
   detectedLanguage: string;
   feedbackResponse: string;
@@ -42,48 +41,15 @@ const DISTRESS_KEYWORDS: Record<string, string[]> = {
   ne: ['गुहार', 'बचाऊ', 'पहिरो', 'खतरा', 'आपत', 'guhar', 'bachau', 'pahiro'],
 };
 
-let activeRecognition: any = null;
-let activeAudioStream: MediaStream | null = null;
-let activeAudioContext: AudioContext | null = null;
-let activeMediaRecorder: MediaRecorder | null = null;
-let recordedAudioChunks: Blob[] = [];
-
 /**
- * Cleanly cancel any active voice recognition session & audio tracks
+ * Execute an AI voice command and return the localized response in the active language
  */
-export function stopActiveVoiceRecognition(): void {
-  if (activeRecognition) {
-    try {
-      activeRecognition.abort();
-    } catch {}
-    activeRecognition = null;
-  }
-  if (activeMediaRecorder && activeMediaRecorder.state !== 'inactive') {
-    try {
-      activeMediaRecorder.stop();
-    } catch {}
-    activeMediaRecorder = null;
-  }
-  if (activeAudioStream) {
-    try {
-      activeAudioStream.getTracks().forEach((track) => track.stop());
-    } catch {}
-    activeAudioStream = null;
-  }
-  if (activeAudioContext && activeAudioContext.state !== 'closed') {
-    try {
-      activeAudioContext.close();
-    } catch {}
-    activeAudioContext = null;
-  }
-  recordedAudioChunks = [];
-}
-
-/**
- * Execute a recognized voice command or quick action
- */
-export function executeVoiceCommand(commandText: string, onResult?: (res: VoiceRecognitionResult) => void): VoiceRecognitionResult {
-  const result = analyzeSpokenText(commandText);
+export function executeVoiceCommand(
+  commandText: string,
+  langCode: LanguageCode = getSelectedLanguage(),
+  onResult?: (res: VoiceRecognitionResult) => void
+): VoiceRecognitionResult {
+  const result = analyzeSpokenText(commandText, langCode);
   if (onResult) onResult(result);
 
   if (result.isPanicCommand) {
@@ -91,206 +57,20 @@ export function executeVoiceCommand(commandText: string, onResult?: (res: VoiceR
     broadcastSOSLocationToEmergencyContacts(25.5788, 91.8933, 'East Khasi Hills • Shillong Sector');
   }
 
-  speakTextOutLoud(result.feedbackResponse);
+  speakTextOutLoud(result.feedbackResponse, langCode);
   return result;
 }
 
 /**
- * Hybrid Voice AI Listener (Web Speech API + HTML5 MediaRecorder + Gemini AI Multimodal Fallback)
+ * Analyze text for queries/distress phrases and return localized feedback
  */
-export function listenForVoiceCommand(
-  onResult: (res: VoiceRecognitionResult) => void,
-  onStatusChange?: (status: 'listening' | 'processing' | 'stopped' | 'error', errorMsg?: string) => void,
-  onInterimText?: (interimText: string) => void,
-  onVolumeChange?: (volume: number) => void
-): () => void {
-  stopActiveVoiceRecognition();
-
-  if (typeof window === 'undefined') return () => {};
-
-  // Auditory chime to indicate listening is active
-  try {
-    playWarningBeep();
-  } catch {}
-
-  let speechRecognized = false;
-  recordedAudioChunks = [];
-
-  // 1. Start Audio Stream with Volume Meter and MediaRecorder
-  if (navigator?.mediaDevices?.getUserMedia) {
-    navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then((stream) => {
-        activeAudioStream = stream;
-
-        // Initialize AudioContext for Volume Meter
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioCtx) {
-          try {
-            const audioCtx = new AudioCtx();
-            activeAudioContext = audioCtx;
-            const source = audioCtx.createMediaStreamSource(stream);
-            const analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 64;
-            source.connect(analyser);
-
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            const updateVolume = () => {
-              if (!activeAudioStream) return;
-              analyser.getByteFrequencyData(dataArray);
-              let sum = 0;
-              for (let i = 0; i < dataArray.length; i++) {
-                sum += dataArray[i];
-              }
-              const avg = sum / dataArray.length;
-              if (onVolumeChange) {
-                onVolumeChange(Math.min(100, Math.round((avg / 128) * 100)));
-              }
-              requestAnimationFrame(updateVolume);
-            };
-            updateVolume();
-          } catch {}
-        }
-
-        // Initialize MediaRecorder to capture audio for Gemini Speech processing
-        if (typeof MediaRecorder !== 'undefined') {
-          try {
-            const mimeType = MediaRecorder.isTypeSupported('audio/webm')
-              ? 'audio/webm'
-              : MediaRecorder.isTypeSupported('audio/mp4')
-              ? 'audio/mp4'
-              : 'audio/ogg';
-
-            const recorder = new MediaRecorder(stream, { mimeType });
-            activeMediaRecorder = recorder;
-            recordedAudioChunks = [];
-
-            recorder.ondataavailable = (e) => {
-              if (e.data.size > 0) {
-                recordedAudioChunks.push(e.data);
-              }
-            };
-
-            recorder.onstop = async () => {
-              if (!speechRecognized && recordedAudioChunks.length > 0) {
-                const audioBlob = new Blob(recordedAudioChunks, { type: mimeType });
-                if (audioBlob.size > 1000) {
-                  if (onStatusChange) onStatusChange('processing');
-                  if (onInterimText) onInterimText('Analyzing speech with Gemini AI...');
-
-                  const geminiResult = await processVoiceAudioWithGemini(audioBlob);
-                  if (geminiResult && geminiResult.spokenText) {
-                    speechRecognized = true;
-                    if (onInterimText) onInterimText(geminiResult.spokenText);
-                    const formattedResult: VoiceRecognitionResult = {
-                      isPanicCommand: geminiResult.isPanicCommand,
-                      actionType: (geminiResult.actionType as any) || 'UNKNOWN',
-                      spokenText: geminiResult.spokenText,
-                      detectedLanguage: 'AI Speech',
-                      feedbackResponse: geminiResult.feedbackResponse,
-                    };
-                    onResult(formattedResult);
-                    if (formattedResult.isPanicCommand) {
-                      playEmergencySiren(4000);
-                      broadcastSOSLocationToEmergencyContacts(25.5788, 91.8933, 'East Khasi Hills • Shillong Sector');
-                    }
-                    speakTextOutLoud(formattedResult.feedbackResponse);
-                    if (onStatusChange) onStatusChange('stopped');
-                    return;
-                  }
-                }
-              }
-              if (onStatusChange) onStatusChange('stopped');
-            };
-
-            recorder.start(250); // Collect slice every 250ms
-          } catch (recErr) {
-            console.warn('MediaRecorder error:', recErr);
-          }
-        }
-      })
-      .catch((err) => {
-        console.warn('Microphone permission error:', err);
-        if (onStatusChange) onStatusChange('error', '🎙️ Please allow microphone access in your browser settings.');
-      });
-  }
-
-  // 2. Start Web Speech Recognition if available
-  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-  if (SpeechRecognition) {
-    try {
-      const recognition = new SpeechRecognition();
-      activeRecognition = recognition;
-
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.maxAlternatives = 1;
-      recognition.lang = navigator.language || 'en-US';
-
-      if (onStatusChange) onStatusChange('listening');
-
-      recognition.onresult = (event: any) => {
-        let interim = '';
-        let final = '';
-
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          const text = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            final += text;
-          } else {
-            interim += text;
-          }
-        }
-
-        const activeText = final.trim() || interim.trim();
-        if (activeText && onInterimText) {
-          onInterimText(activeText);
-        }
-
-        if (final.trim()) {
-          speechRecognized = true;
-          if (onStatusChange) onStatusChange('processing');
-          executeVoiceCommand(final.trim(), onResult);
-          stopActiveVoiceRecognition();
-          if (onStatusChange) onStatusChange('stopped');
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        const err = event?.error;
-        console.warn('WebSpeech notice (Gemini fallback active):', err);
-        // If web speech has network/offline issue, MediaRecorder + Gemini will process audio seamlessly!
-      };
-
-      recognition.onend = () => {
-        if (activeRecognition && !speechRecognized) {
-          // Keep active
-        }
-      };
-
-      recognition.start();
-    } catch (e: any) {
-      console.warn('WebSpeech init notice:', e);
-    }
-  } else {
-    if (onStatusChange) onStatusChange('listening');
-  }
-
-  return () => {
-    stopActiveVoiceRecognition();
-  };
-}
-
-/**
- * Analyze transcript for distress/panic phrases in any Seven Sister language
- */
-export function analyzeSpokenText(transcript: string): VoiceRecognitionResult {
+export function analyzeSpokenText(transcript: string, langCode: LanguageCode = getSelectedLanguage()): VoiceRecognitionResult {
   const textLower = transcript.toLowerCase().trim();
+  const t = getTranslations(langCode);
 
   // Search across ALL regional languages for panic keywords
   let isPanic = false;
-  let matchedLang = 'English';
+  let matchedLang = langCode.toUpperCase();
 
   for (const [lang, keywords] of Object.entries(DISTRESS_KEYWORDS)) {
     for (const kw of keywords) {
@@ -303,63 +83,63 @@ export function analyzeSpokenText(transcript: string): VoiceRecognitionResult {
     if (isPanic) break;
   }
 
-  if (isPanic || textLower.includes('sos') || textLower.includes('help') || textLower.includes('danger') || textLower.includes('save me') || textLower.includes('emergency')) {
+  if (isPanic || textLower.includes('sos') || textLower.includes('help') || textLower.includes('danger') || textLower.includes('save me') || textLower.includes('emergency') || textLower.includes('बचाओ') || textLower.includes('বাঁচাও') || textLower.includes('সহায়')) {
     return {
       isPanicCommand: true,
       actionType: 'SOS',
       spokenText: transcript,
       detectedLanguage: matchedLang,
-      feedbackResponse: '🚨 Emergency Distress Detected! High Siren Activated & GPS SOS Dispatched to NDRF 1078.',
+      feedbackResponse: t.responseSos,
     };
   }
 
-  if (textLower.includes('alert') || textLower.includes('warning') || textLower.includes('bipod') || textLower.includes('khatra') || textLower.includes('hazard')) {
-    return {
-      isPanicCommand: false,
-      actionType: 'ALERTS',
-      spokenText: transcript,
-      detectedLanguage: matchedLang,
-      feedbackResponse: '⚠️ High Hazard Warning: East Khasi & South Garo Hills. Rainfall 140mm/24h. Evacuate unstable slopes.',
-    };
-  }
-
-  if (textLower.includes('helpline') || textLower.includes('number') || textLower.includes('phone') || textLower.includes('call') || textLower.includes('police') || textLower.includes('ndrf')) {
-    return {
-      isPanicCommand: false,
-      actionType: 'HELPLINES',
-      spokenText: transcript,
-      detectedLanguage: matchedLang,
-      feedbackResponse: '📞 Emergency Hotlines: National 112, NDRF 1078, State Disaster Operation 1070.',
-    };
-  }
-
-  if (textLower.includes('shelter') || textLower.includes('camp') || textLower.includes('shngiam') || textLower.includes('relief') || textLower.includes('safe')) {
+  if (textLower.includes('shelter') || textLower.includes('camp') || textLower.includes('shngiam') || textLower.includes('relief') || textLower.includes('safe') || textLower.includes('शिविर') || textLower.includes('আশ্রয়') || textLower.includes('ত্রাণ')) {
     return {
       isPanicCommand: false,
       actionType: 'SHELTERS',
       spokenText: transcript,
       detectedLanguage: matchedLang,
-      feedbackResponse: '🏠 Nearest Relief Camp: JN Stadium Polo Grounds (340/1200 Capacity). Supplies active.',
+      feedbackResponse: t.responseShelters,
     };
   }
 
-  if (textLower.includes('weather') || textLower.includes('rain') || textLower.includes('radar') || textLower.includes('forecast')) {
+  if (textLower.includes('weather') || textLower.includes('rain') || textLower.includes('radar') || textLower.includes('forecast') || textLower.includes('मौसम') || textLower.includes('বৃষ্টি') || textLower.includes('বৰষুণ') || textLower.includes('slap')) {
     return {
       isPanicCommand: false,
       actionType: 'WEATHER',
       spokenText: transcript,
       detectedLanguage: matchedLang,
-      feedbackResponse: '🌧️ Weather Advisory: Heavy monsoon downpour continuing across Meghalaya & Sikkim. Slope saturation 87%.',
+      feedbackResponse: t.responseWeather,
     };
   }
 
-  if (textLower.includes('route') || textLower.includes('road') || textLower.includes('traffic') || textLower.includes('bypass') || textLower.includes('block')) {
+  if (textLower.includes('route') || textLower.includes('road') || textLower.includes('traffic') || textLower.includes('bypass') || textLower.includes('block') || textLower.includes('सड़क') || textLower.includes('পথ') || textLower.includes('surok') || textLower.includes('rama') || textLower.includes('kawng')) {
     return {
       isPanicCommand: false,
       actionType: 'ROUTES',
       spokenText: transcript,
       detectedLanguage: matchedLang,
-      feedbackResponse: '🛣️ Route Advisory: NH-10 Teesta Bazaar is blocked. Emergency traffic diverted via Lava pass.',
+      feedbackResponse: t.responseRoad,
+    };
+  }
+
+  if (textLower.includes('helpline') || textLower.includes('number') || textLower.includes('phone') || textLower.includes('call') || textLower.includes('police') || textLower.includes('ndrf') || textLower.includes('हेल्पलाइन') || textLower.includes('ফোন')) {
+    return {
+      isPanicCommand: false,
+      actionType: 'HELPLINES',
+      spokenText: transcript,
+      detectedLanguage: matchedLang,
+      feedbackResponse: t.responseHelplines,
+    };
+  }
+
+  if (textLower.includes('medical') || textLower.includes('convoy') || textLower.includes('medicine') || textLower.includes('food') || textLower.includes('চিকিৎসা') || textLower.includes('दवा') || textLower.includes('dawai')) {
+    return {
+      isPanicCommand: false,
+      actionType: 'MEDICAL',
+      spokenText: transcript,
+      detectedLanguage: matchedLang,
+      feedbackResponse: t.responseMedical,
     };
   }
 
@@ -368,20 +148,33 @@ export function analyzeSpokenText(transcript: string): VoiceRecognitionResult {
     actionType: 'UNKNOWN',
     spokenText: transcript,
     detectedLanguage: matchedLang,
-    feedbackResponse: `Heard: "${transcript}". Ask about "Shelters", "Weather", "Road Status", or say "Help SOS".`,
+    feedbackResponse: t.responseShelters,
   };
 }
 
 /**
- * Speak text out loud using Web Speech Synthesis (Text-to-Speech)
+ * Speak text out loud using Web Speech Synthesis (Text-to-Speech) in the chosen language voice
  */
 export function speakTextOutLoud(text: string, langCode: LanguageCode = getSelectedLanguage()): void {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   try {
     window.speechSynthesis.cancel(); // Stop current speech
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = langCode === 'hi' ? 'hi-IN' : langCode === 'bn' ? 'bn-IN' : 'en-IN';
-    utterance.rate = 1.0;
+    
+    // Choose appropriate voice locale
+    if (langCode === 'hi') {
+      utterance.lang = 'hi-IN';
+    } else if (langCode === 'bn') {
+      utterance.lang = 'bn-IN';
+    } else if (langCode === 'as') {
+      utterance.lang = 'as-IN';
+    } else if (langCode === 'ne') {
+      utterance.lang = 'ne-NP';
+    } else {
+      utterance.lang = 'en-IN';
+    }
+
+    utterance.rate = 0.95;
     utterance.pitch = 1.0;
     window.speechSynthesis.speak(utterance);
   } catch (e) {

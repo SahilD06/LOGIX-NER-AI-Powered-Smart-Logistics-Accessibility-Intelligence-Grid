@@ -1,53 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Image, Modal, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ShieldAlert, PhoneCall, User, FlaskConical, Globe, Radio, Volume2, X, Check, Send, Sparkles, Navigation, CloudRain, Shield, AlertTriangle, Home, Phone } from 'lucide-react-native';
+import { ShieldAlert, PhoneCall, User, FlaskConical, Globe, Radio, Volume2, X, Check, Send } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { ThemeToggleSwitch } from './ThemeToggleSwitch';
-import {
-  SUPPORTED_LANGUAGES,
-  LanguageCode,
-  getSelectedLanguage,
-  setSelectedLanguage,
-  getTranslations,
-} from '../services/languageService';
-import {
-  executeVoiceCommand,
-} from '../services/voiceCommandService';
+import { SUPPORTED_LANGUAGES, LanguageCode } from '../services/languageService';
+import { executeVoiceCommand } from '../services/voiceCommandService';
 
 interface HeaderProps {
   onRefresh?: () => void;
   isLive?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
+export const Header: React.FC<HeaderProps> = () => {
   const { colors, isDark } = useAppTheme();
   const { user, isAuthenticated, currentRole } = useAuth();
+  const { language, setLanguage, t, activeLangObj } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
   const safeTop = Math.max(insets.top + (Platform.OS === 'ios' ? 6 : 8), Platform.OS === 'ios' ? 44 : Platform.OS === 'android' ? 32 : 18);
 
-  const [currentLang, setCurrentLangState] = useState<LanguageCode>('en');
   const [showLangModal, setShowLangModal] = useState(false);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [voiceQueryText, setVoiceQueryText] = useState('');
-  const [voiceResponse, setVoiceResponse] = useState<string | null>(
-    '🏠 Nearest Relief Camp: JN Stadium Polo Grounds (340/1200 Capacity). Supplies active.'
-  );
-
-  useEffect(() => {
-    setCurrentLangState(getSelectedLanguage());
-  }, []);
-
-  const t = getTranslations(currentLang);
-  const activeLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === currentLang) || SUPPORTED_LANGUAGES[0];
+  const [voiceResponse, setVoiceResponse] = useState<string>(t.responseShelters);
 
   const handleSelectLanguage = (code: LanguageCode) => {
-    setSelectedLanguage(code);
-    setCurrentLangState(code);
+    setLanguage(code);
     setShowLangModal(false);
   };
 
@@ -58,7 +41,7 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
   const handleExecuteCustomQuery = (query: string) => {
     if (!query.trim()) return;
     setVoiceQueryText('');
-    const res = executeVoiceCommand(query);
+    const res = executeVoiceCommand(query, language);
     setVoiceResponse(res.feedbackResponse);
   };
 
@@ -169,8 +152,8 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
                   <Radio size={18} color={colors.steelBlue} />
                 </View>
                 <View>
-                  <Text style={[styles.voiceModalTitle, { color: colors.textPrimary }]}>LOGIX AI Voice Assistant</Text>
-                  <Text style={[styles.voiceModalSubtitle, { color: colors.steelBlue }]}>Seven Sisters Regional Grid</Text>
+                  <Text style={[styles.voiceModalTitle, { color: colors.textPrimary }]}>{t.voiceAssistantTitle}</Text>
+                  <Text style={[styles.voiceModalSubtitle, { color: colors.steelBlue }]}>{t.voiceAssistantSub}</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={() => setShowVoiceModal(false)} style={styles.closeBtn}>
@@ -179,28 +162,26 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
             </View>
 
             {/* Spoken AI Response Box */}
-            {voiceResponse ? (
-              <View style={[styles.aiResponseBox, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
-                <View style={styles.responseHeaderRow}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Volume2 size={16} color={colors.steelBlue} />
-                    <Text style={[styles.responseLabel, { color: colors.steelBlue }]}>AI Spoken Response</Text>
-                  </View>
-                  <TouchableOpacity onPress={() => executeVoiceCommand(voiceResponse)} style={styles.replayBtn}>
-                    <Text style={[styles.replayText, { color: colors.steelBlue }]}>🔊 Replay Audio</Text>
-                  </TouchableOpacity>
+            <View style={[styles.aiResponseBox, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
+              <View style={styles.responseHeaderRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Volume2 size={16} color={colors.steelBlue} />
+                  <Text style={[styles.responseLabel, { color: colors.steelBlue }]}>{t.aiSpokenResponse}</Text>
                 </View>
-                <Text style={[styles.responseTextContent, { color: colors.textPrimary }]}>
-                  {voiceResponse}
-                </Text>
+                <TouchableOpacity onPress={() => executeVoiceCommand(voiceResponse, language)} style={styles.replayBtn}>
+                  <Text style={[styles.replayText, { color: colors.steelBlue }]}>{t.replayAudio}</Text>
+                </TouchableOpacity>
               </View>
-            ) : null}
+              <Text style={[styles.responseTextContent, { color: colors.textPrimary }]}>
+                {voiceResponse}
+              </Text>
+            </View>
 
             {/* Text Query Input Bar */}
             <View style={[styles.textInputRow, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
               <TextInput
                 style={[styles.textInputStyle, { color: colors.textPrimary }]}
-                placeholder="Type a question (e.g. Shelters, Weather, NH-10)..."
+                placeholder={t.typeQuestionPlaceholder}
                 placeholderTextColor={colors.textMuted}
                 value={voiceQueryText}
                 onChangeText={setVoiceQueryText}
@@ -216,15 +197,15 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
             </View>
 
             {/* Instant Action Grid */}
-            <Text style={[styles.quickActionsTitle, { color: colors.textSecondary }]}>QUICK VOICE COMMANDS:</Text>
+            <Text style={[styles.quickActionsTitle, { color: colors.textSecondary }]}>{t.quickCommandsTitle}</Text>
             <View style={styles.quickGrid}>
               <TouchableOpacity
                 style={[styles.quickGridCard, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]}
                 onPress={() => handleExecuteCustomQuery('Help! Bachao! SOS Emergency')}
               >
                 <Text style={styles.quickCardEmoji}>🚨</Text>
-                <Text style={[styles.quickCardTitle, { color: colors.danger }]}>Emergency SOS</Text>
-                <Text style={[styles.quickCardDesc, { color: colors.danger }]}>Siren + GPS Broadcast</Text>
+                <Text style={[styles.quickCardTitle, { color: colors.danger }]}>{t.cmdSosTitle}</Text>
+                <Text style={[styles.quickCardDesc, { color: colors.danger }]}>{t.cmdSosDesc}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -232,8 +213,8 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
                 onPress={() => handleExecuteCustomQuery('Where are the nearest relief shelters?')}
               >
                 <Text style={styles.quickCardEmoji}>🏠</Text>
-                <Text style={[styles.quickCardTitle, { color: colors.textPrimary }]}>Relief Shelters</Text>
-                <Text style={[styles.quickCardDesc, { color: colors.textMuted }]}>Nearest Safe Camps</Text>
+                <Text style={[styles.quickCardTitle, { color: colors.textPrimary }]}>{t.cmdSheltersTitle}</Text>
+                <Text style={[styles.quickCardDesc, { color: colors.textMuted }]}>{t.cmdSheltersDesc}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -241,8 +222,8 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
                 onPress={() => handleExecuteCustomQuery('What is the weather and rain forecast?')}
               >
                 <Text style={styles.quickCardEmoji}>🌧️</Text>
-                <Text style={[styles.quickCardTitle, { color: colors.textPrimary }]}>Monsoon Weather</Text>
-                <Text style={[styles.quickCardDesc, { color: colors.textMuted }]}>Rainfall & Saturation</Text>
+                <Text style={[styles.quickCardTitle, { color: colors.textPrimary }]}>{t.cmdWeatherTitle}</Text>
+                <Text style={[styles.quickCardDesc, { color: colors.textMuted }]}>{t.cmdWeatherDesc}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -250,8 +231,8 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
                 onPress={() => handleExecuteCustomQuery('Check highway road blockages and bypass routes')}
               >
                 <Text style={styles.quickCardEmoji}>🛣️</Text>
-                <Text style={[styles.quickCardTitle, { color: colors.textPrimary }]}>Road & Bypass</Text>
-                <Text style={[styles.quickCardDesc, { color: colors.textMuted }]}>NH-10 Lava Diversion</Text>
+                <Text style={[styles.quickCardTitle, { color: colors.textPrimary }]}>{t.cmdRoadTitle}</Text>
+                <Text style={[styles.quickCardDesc, { color: colors.textMuted }]}>{t.cmdRoadDesc}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -259,8 +240,8 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
                 onPress={() => handleExecuteCustomQuery('Give me emergency disaster helplines')}
               >
                 <Text style={styles.quickCardEmoji}>📞</Text>
-                <Text style={[styles.quickCardTitle, { color: colors.textPrimary }]}>Helplines</Text>
-                <Text style={[styles.quickCardDesc, { color: colors.textMuted }]}>NDRF 1078 & 112</Text>
+                <Text style={[styles.quickCardTitle, { color: colors.textPrimary }]}>{t.cmdHelplinesTitle}</Text>
+                <Text style={[styles.quickCardDesc, { color: colors.textMuted }]}>{t.cmdHelplinesDesc}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -268,8 +249,8 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
                 onPress={() => handleExecuteCustomQuery('Is the medical and food supply route clear?')}
               >
                 <Text style={styles.quickCardEmoji}>🚑</Text>
-                <Text style={[styles.quickCardTitle, { color: colors.textPrimary }]}>Medical Convoys</Text>
-                <Text style={[styles.quickCardDesc, { color: colors.textMuted }]}>Essential Supply Grid</Text>
+                <Text style={[styles.quickCardTitle, { color: colors.textPrimary }]}>{t.cmdMedicalTitle}</Text>
+                <Text style={[styles.quickCardDesc, { color: colors.textMuted }]}>{t.cmdMedicalDesc}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -296,7 +277,7 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
 
             <ScrollView style={styles.langList} showsVerticalScrollIndicator={false}>
               {SUPPORTED_LANGUAGES.map((item) => {
-                const isSelected = item.code === currentLang;
+                const isSelected = item.code === language;
                 return (
                   <TouchableOpacity
                     key={item.code}

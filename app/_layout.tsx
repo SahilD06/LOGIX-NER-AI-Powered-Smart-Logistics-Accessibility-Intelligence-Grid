@@ -6,6 +6,7 @@ import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from '../context/ThemeContext';
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { LanguageProvider } from '../context/LanguageContext';
 import { GeminiChatbot } from '../components/GeminiChatbot';
 import { LoginOnboardingScreen } from '../components/LoginOnboardingScreen';
 
@@ -60,12 +61,13 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <ThemeProvider>
-          <AppNavigation />
-        </ThemeProvider>
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            <AppNavigation />
+          </ThemeProvider>
+        </AuthProvider>
+      </LanguageProvider>
     </SafeAreaProvider>
   );
 }
-

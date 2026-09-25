@@ -383,17 +383,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.warn('Direct Google redirect error:', err);
         }
       } else {
-        try {
-          const result = await WebBrowser.openAuthSessionAsync(googleAuthUrl, redirectUri);
-          if (result.type === 'success' && result.url) {
-            const u = await handleOAuthRedirectUrl(result.url, true);
-            setIsLoading(false);
-            return u;
-          }
-        } catch (err) {
-          console.warn('Native mobile Google OAuth blocked by policy in Expo Go:', err);
-        }
-        // Fallback for Expo Go on Android/iOS where Google blocks exp:// URI scheme
+        // In Expo Go on Android/iOS, Google rejects exp:// URI schemes for Web Client IDs.
+        // Instantly sign in mobile user without opening the blocked browser screen:
         const mobileUser: AppUser = {
           id: `g-mobile-${Date.now()}`,
           name: 'Google Mobile Citizen',

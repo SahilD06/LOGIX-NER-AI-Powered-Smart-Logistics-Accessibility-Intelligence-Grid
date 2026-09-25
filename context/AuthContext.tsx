@@ -409,55 +409,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return null;
   };
 
-    // 2. On Web: Use Google Identity Services (GIS) Token Client popup if initialized
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && (window as any).google?.accounts?.oauth2) {
-      try {
-        const authedUser = await new Promise<AppUser | null>((resolve) => {
-          try {
-            const tokenClient = (window as any).google.accounts.oauth2.initTokenClient({
-              client_id: clientId,
-              scope: 'openid email profile https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
-              callback: async (tokenResponse: any) => {
-                if (tokenResponse?.error) {
-                  console.warn('Google OAuth popup error:', tokenResponse);
-                  setIsLoading(false);
-                  resolve(null);
-                  return;
-                }
-                if (tokenResponse?.access_token) {
-                  const fetched = await fetchGoogleUser(tokenResponse.access_token, !forOnboarding);
-                  resolve(fetched);
-                } else {
-                  setIsLoading(false);
-                  resolve(null);
-                }
-              },
-              error_callback: (err: any) => {
-                console.warn('GIS Token client error:', err);
-                setIsLoading(false);
-                resolve(null);
-              },
-            });
-            tokenClient.requestAccessToken({ prompt: 'select_account' });
-          } catch (initErr) {
-            console.warn('Failed to initialize GIS token client:', initErr);
-            resolve(null);
-          }
-        });
-
-        if (authedUser) {
-          setIsLoading(false);
-          return authedUser;
-        }
-      } catch (gisErr) {
-        console.warn('GIS Token client exception:', gisErr);
-      }
-    }
-
-    setIsLoading(false);
-    return null;
-  };
-
   const updateUser = (updates: Partial<AppUser>) => {
     if (!user) return;
     const updated = { ...user, ...updates };

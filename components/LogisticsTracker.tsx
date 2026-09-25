@@ -32,6 +32,7 @@ import {
   Compass,
 } from 'lucide-react-native';
 import { useAppTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
   DISTRICT_ACCESSIBILITY_DATA,
   ESSENTIAL_CONVOYS,
@@ -53,6 +54,7 @@ export function LogisticsTracker({
   onSimulateDanger,
 }: LogisticsTrackerProps) {
   const { colors, isDark } = useAppTheme();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<'convoys' | 'ai_routing' | 'isolated_villages' | 'alerts'>('convoys');
   const [selectedCorridor, setSelectedCorridor] = useState('NH-10 Sevoke');
   const [isDisasterMode, setIsDisasterMode] = useState(false);
@@ -189,10 +191,10 @@ export function LogisticsTracker({
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.title, { color: colors.textPrimary }]}>
-              LOGIX-NER — Intelligence Grid
+              {t.logisticsTitle}
             </Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Smart Logistics, Route Graph Optimizer & Isolated Village Detector
+              {t.logisticsSub}
             </Text>
           </View>
         </View>
@@ -206,7 +208,7 @@ export function LogisticsTracker({
           >
             <Truck size={14} color={activeTab === 'convoys' ? '#FFFFFF' : colors.textSecondary} />
             <Text style={[styles.tabBtnText, { color: activeTab === 'convoys' ? '#FFFFFF' : colors.textSecondary }]}>
-              1. Convoy Fleet ({ESSENTIAL_CONVOYS.length})
+              {t.tabConvoyFleet} ({ESSENTIAL_CONVOYS.length})
             </Text>
           </TouchableOpacity>
 
@@ -217,7 +219,7 @@ export function LogisticsTracker({
           >
             <Sparkles size={14} color={activeTab === 'ai_routing' ? '#FFFFFF' : colors.textSecondary} />
             <Text style={[styles.tabBtnText, { color: activeTab === 'ai_routing' ? '#FFFFFF' : colors.textSecondary }]}>
-              2. AI Graph Routing
+              {t.tabAiRouting}
             </Text>
           </TouchableOpacity>
 
@@ -228,7 +230,7 @@ export function LogisticsTracker({
           >
             <MapPin size={14} color={activeTab === 'isolated_villages' ? '#FFFFFF' : colors.textSecondary} />
             <Text style={[styles.tabBtnText, { color: activeTab === 'isolated_villages' ? '#FFFFFF' : colors.textSecondary }]}>
-              3. Isolated Villages ({ISOLATED_VILLAGES_DATA.length})
+              {t.tabIsolatedVillages} ({ISOLATED_VILLAGES_DATA.length})
             </Text>
           </TouchableOpacity>
 
@@ -239,7 +241,7 @@ export function LogisticsTracker({
           >
             <Radio size={14} color={activeTab === 'alerts' ? '#FFFFFF' : colors.textSecondary} />
             <Text style={[styles.tabBtnText, { color: activeTab === 'alerts' ? '#FFFFFF' : colors.textSecondary }]}>
-              4. IVR & Alerts
+              {t.tabIvrAlerts}
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -252,12 +254,12 @@ export function LogisticsTracker({
           <View style={[styles.demoBanner, { backgroundColor: demoLandslideActive ? colors.warningBg : colors.subPanel, borderColor: demoLandslideActive ? colors.warningBorder : colors.border }]}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.demoBannerTitle, { color: demoLandslideActive ? colors.warning : colors.textPrimary }]}>
-                {demoLandslideActive ? '⚡ LIVE RE-ROUTE SIMULATION ACTIVE' : '🚛 Live Fleet GPS & Mid-Transit Rerouting'}
+                {demoLandslideActive ? `⚡ ${t.reRouteAdviceTitle}` : `🚛 ${t.activeConvoysCard}`}
               </Text>
               <Text style={[styles.demoBannerSub, { color: colors.textSecondary }]}>
                 {demoLandslideActive
-                  ? 'Landslide triggered at Teesta Bazaar. Medical Convoy SK-01-GA-4890 dynamically recalculated & diverted via Lava Bypass!'
-                  : 'Click below to simulate a live landslide on NH-10 and see the truck instantly recalculate to an alternate bypass.'}
+                  ? t.responseRoad
+                  : t.logisticsSub}
               </Text>
             </View>
             <TouchableOpacity
@@ -270,7 +272,7 @@ export function LogisticsTracker({
             >
               <Zap size={14} color="#ffffff" />
               <Text style={styles.demoBtnText}>
-                {demoLandslideActive ? 'Reset Simulation' : '🔺 Simulate Landslide ➔ Trigger Reroute'}
+                {demoLandslideActive ? t.resetSimulation : `🔺 ${t.simulateLandslide}`}
               </Text>
             </TouchableOpacity>
           </View>
@@ -285,7 +287,7 @@ export function LogisticsTracker({
                   borderColor: isDark ? '#334155' : '#CBD5E1',
                 },
               ]}
-              placeholder="Search convoy by cargo, vehicle no, route..."
+              placeholder={t.searchConvoyPlaceholder}
               placeholderTextColor={colors.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}

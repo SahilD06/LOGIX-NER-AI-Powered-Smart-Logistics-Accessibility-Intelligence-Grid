@@ -5,6 +5,7 @@ import { ESSENTIAL_CONVOYS } from '../services/logisticsService';
 import { NasaEvent } from '../services/api';
 import { MapPin, AlertTriangle, Activity, Satellite, Layers, ZoomIn, ZoomOut, Compass, Truck } from 'lucide-react-native';
 import { useAppTheme } from '../context/ThemeContext';
+import { useLanguage } from '../context/LanguageContext';
 
 interface InteractiveMapProps {
   nasaEvents?: NasaEvent[];
@@ -74,6 +75,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onSelectLocation,
 }) => {
   const { colors, isDark } = useAppTheme();
+  const { t } = useLanguage();
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [basemap, setBasemap] = useState<BasemapType>('topo');
   const [isLeafletReady, setIsLeafletReady] = useState(false);
@@ -494,8 +496,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       <View style={[styles.mapHeader, { borderBottomColor: colors.border, backgroundColor: colors.subPanel }]}>
         <View style={styles.titleRow}>
           <Layers size={18} color={colors.steelBlue} />
-          <Text style={[styles.mapTitle, { color: colors.textPrimary }]}>NER Spatial GIS Radar</Text>
-          <Text style={[styles.subtext, { color: colors.textSecondary }]}>(Live Terrain & Satellite GIS)</Text>
+          <Text style={[styles.mapTitle, { color: colors.textPrimary }]}>{t.spatialGisRadar}</Text>
+          <Text style={[styles.subtext, { color: colors.textSecondary }]}>({t.liveTerrainSatellite})</Text>
 
           {/* Basemap Toggle Buttons */}
           <View style={[styles.basemapToggleRow, { backgroundColor: colors.borderSoft, borderColor: colors.border }]}>
@@ -506,7 +508,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 onPress={() => setBasemap(type)}
               >
                 <Text style={[styles.basemapBtnText, { color: basemap === type ? '#ffffff' : colors.textSecondary }]}>
-                  {type === 'topo' ? 'Topo' : 'Satellite'}
+                  {type === 'topo' ? t.topoBasemap : t.satelliteBasemap}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -526,7 +528,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             activeOpacity={0.8}
           >
             <Text style={[styles.filterChipText, { color: activeFilter === 'all' ? '#ffffff' : colors.textPrimary }]}>
-              All Layers
+              {t.allLayers}
             </Text>
           </TouchableOpacity>
 
@@ -542,7 +544,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           >
             <Truck size={13} color={activeFilter === 'convoys' ? '#ffffff' : colors.steelBlue} />
             <Text style={[styles.filterChipText, { color: activeFilter === 'convoys' ? '#ffffff' : colors.textPrimary }]}>
-              Supply Vehicles ({ESSENTIAL_CONVOYS.length})
+              {t.supplyVehicles} ({ESSENTIAL_CONVOYS.length})
             </Text>
           </TouchableOpacity>
 
@@ -558,7 +560,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           >
             <MapPin size={13} color={activeFilter === 'corridors' ? '#ffffff' : colors.warning} />
             <Text style={[styles.filterChipText, { color: activeFilter === 'corridors' ? '#ffffff' : colors.textPrimary }]}>
-              Highway Corridors (3)
+              {t.highwayCorridors} (3)
             </Text>
           </TouchableOpacity>
 
@@ -574,7 +576,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           >
             <AlertTriangle size={13} color={activeFilter === 'zones' ? '#ffffff' : colors.danger} />
             <Text style={[styles.filterChipText, { color: activeFilter === 'zones' ? '#ffffff' : colors.textPrimary }]}>
-              Vulnerable Road Zones
+              {t.vulnerableRoadZones}
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -608,22 +610,22 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             },
           ]}
         >
-          <Text style={[styles.legendTitle, { color: colors.textMuted }]}>LEGEND</Text>
+          <Text style={[styles.legendTitle, { color: colors.textMuted }]}>{t.legendTitle}</Text>
           <View style={styles.legendRow}>
             <View style={[styles.legendDot, { backgroundColor: colors.steelBlue }]} />
-            <Text style={[styles.legendItemText, { color: colors.textPrimary }]}>🚚 Convoy</Text>
+            <Text style={[styles.legendItemText, { color: colors.textPrimary }]}>{t.legendConvoy}</Text>
           </View>
           <View style={styles.legendRow}>
             <View style={[styles.legendDot, { backgroundColor: colors.danger }]} />
-            <Text style={[styles.legendItemText, { color: colors.textPrimary }]}>🔴 Blocked</Text>
+            <Text style={[styles.legendItemText, { color: colors.textPrimary }]}>{t.legendBlocked}</Text>
           </View>
           <View style={styles.legendRow}>
             <View style={[styles.legendDot, { backgroundColor: colors.warning }]} />
-            <Text style={[styles.legendItemText, { color: colors.textPrimary }]}>🟡 High Risk</Text>
+            <Text style={[styles.legendItemText, { color: colors.textPrimary }]}>{t.legendHighRisk}</Text>
           </View>
           <View style={styles.legendRow}>
             <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
-            <Text style={[styles.legendItemText, { color: colors.textPrimary }]}>🟢 Clear Pass</Text>
+            <Text style={[styles.legendItemText, { color: colors.textPrimary }]}>{t.legendClearPass}</Text>
           </View>
         </View>
 

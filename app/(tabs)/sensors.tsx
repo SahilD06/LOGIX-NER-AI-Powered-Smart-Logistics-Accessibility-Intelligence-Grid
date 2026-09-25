@@ -9,19 +9,21 @@ import {
   Clock,
 } from 'lucide-react-native';
 import { useAppTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 export default function SensorsScreen() {
   const { colors, isDark } = useAppTheme();
+  const { t } = useLanguage();
   const [activeSegment, setActiveSegment] = useState<'sensors' | 'highways'>('sensors');
   const [selectedSensorType, setSelectedSensorType] = useState<string>('all');
 
   const sensorTypes = [
-    { key: 'all', label: 'All Probes' },
-    { key: 'soil_moisture', label: 'Soil Moisture' },
-    { key: 'inclinometer', label: 'Inclinometers' },
-    { key: 'rain_gauge', label: 'Rain Gauges' },
-    { key: 'water_level', label: 'Water Level' },
-    { key: 'extensometer', label: 'Extensometers' },
+    { key: 'all', label: t.allLayers },
+    { key: 'soil_moisture', label: t.soilMoisture },
+    { key: 'inclinometer', label: t.tiltAngle },
+    { key: 'rain_gauge', label: t.rainfallGauge },
+    { key: 'water_level', label: t.porePressure },
+    { key: 'extensometer', label: t.liveStatus },
   ];
 
   const filteredSensors =
@@ -40,7 +42,7 @@ export default function SensorsScreen() {
         >
           <Activity size={16} color={activeSegment === 'sensors' ? '#ffffff' : colors.textSecondary} />
           <Text style={[styles.segmentText, { color: activeSegment === 'sensors' ? '#ffffff' : colors.textSecondary }]}>
-            IoT Slope Sensors ({MOCK_SENSORS.length})
+            {t.sensorsTitle} ({MOCK_SENSORS.length})
           </Text>
         </TouchableOpacity>
 
@@ -50,7 +52,7 @@ export default function SensorsScreen() {
         >
           <Navigation size={16} color={activeSegment === 'highways' ? '#ffffff' : colors.textSecondary} />
           <Text style={[styles.segmentText, { color: activeSegment === 'highways' ? '#ffffff' : colors.textSecondary }]}>
-            National Highways ({CONNECTIVITY_STATUS.length})
+            {t.highwayCorridors} ({CONNECTIVITY_STATUS.length})
           </Text>
         </TouchableOpacity>
       </View>

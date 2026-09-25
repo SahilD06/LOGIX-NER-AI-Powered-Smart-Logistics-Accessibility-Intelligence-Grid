@@ -30,12 +30,14 @@ import {
 } from 'lucide-react-native';
 import { useAppTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { verifyLandslidePhoto, HazardVerificationResult } from '../../services/hazardImageClassifier';
 import { saveIncidentReportToSupabase } from '../../services/supabase';
 
 export default function FieldReportScreen() {
   const { colors, isDark } = useAppTheme();
   const { user, isAuthenticated } = useAuth();
+  const { t } = useLanguage();
 
   const [locationName, setLocationName] = useState('Shillong Peak Bypass (NH-6)');
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number; accuracy?: number } | null>({

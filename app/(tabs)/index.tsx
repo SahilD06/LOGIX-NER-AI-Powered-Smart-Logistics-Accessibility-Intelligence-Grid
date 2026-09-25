@@ -19,12 +19,14 @@ import { calculateRisk, RiskEvaluation } from '../../services/aiEngine';
 import { CONNECTIVITY_STATUS } from '../../services/mockData';
 import { MapPin, Navigation, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useAppTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { requestUserLocationWithChoice, UserLocation, LocationPrecisionMode } from '../../services/locationService';
 import { LocationChoiceModal } from '../../components/LocationChoiceModal';
 
 export default function DashboardScreen() {
   const router = useRouter();
   const { colors, isDark } = useAppTheme();
+  const { t } = useLanguage();
   const [telemetry, setTelemetry] = useState<TelemetryData | null>(null);
   const [nasaEvents, setNasaEvents] = useState<NasaEvent[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -159,13 +161,13 @@ export default function DashboardScreen() {
                   <View style={[styles.liveGpsBadge, { backgroundColor: colors.successBg, borderColor: colors.successBorder }]}>
                     <View style={[styles.liveGpsDot, { backgroundColor: colors.success }]} />
                     <Text style={[styles.liveGpsText, { color: colors.success }]}>
-                      {userLocation.precisionMode === 'approximate' ? 'Approx. District' : 'Live GPS'} {userLocation.accuracy ? `(±${userLocation.accuracy}m)` : ''}
+                      {userLocation.precisionMode === 'approximate' ? t.approxDistrictText : t.liveGpsText} {userLocation.accuracy ? `(±${userLocation.accuracy}m)` : ''}
                     </Text>
                   </View>
                 )}
               </View>
               <Text style={[styles.locationCoordsText, { color: colors.textMuted }]}>
-                {userLocation.latitude.toFixed(4)}°N, {userLocation.longitude.toFixed(4)}°E • Tap to change mode
+                {userLocation.latitude.toFixed(4)}°N, {userLocation.longitude.toFixed(4)}°E • {t.tapToChangeMode}
               </Text>
             </View>
           </View>
@@ -191,7 +193,7 @@ export default function DashboardScreen() {
           <View style={styles.sectionHeader}>
             <View style={styles.sectionHeaderLeft}>
               <Navigation size={16} color={colors.steelBlue} />
-              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>High-Risk Highway Corridors</Text>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>{t.highRiskCorridors}</Text>
             </View>
             <View style={styles.scrollNavControls}>
               <TouchableOpacity
@@ -225,6 +227,7 @@ export default function DashboardScreen() {
               const cardBg = isBlocked ? colors.dangerBg : isVulnerable ? colors.warningBg : colors.successBg;
               const cardBorder = isBlocked ? colors.dangerBorder : isVulnerable ? colors.warningBorder : colors.successBorder;
               const statusColor = isBlocked ? colors.danger : isVulnerable ? colors.warning : colors.success;
+              const translatedStatus = isBlocked ? t.blockedStatus : isVulnerable ? t.vulnerableStatus : t.clearStatus;
 
               return (
                 <View
@@ -243,7 +246,7 @@ export default function DashboardScreen() {
                     <Text style={[styles.corridorRoute, { color: colors.textPrimary }]}>{item.route}</Text>
                     <View style={[styles.statusPill, { backgroundColor: statusColor, borderColor: statusColor }]}>
                       <Text style={[styles.statusPillText, { color: '#ffffff' }]}>
-                        {item.status.toUpperCase()}
+                        {translatedStatus}
                       </Text>
                     </View>
                   </View>

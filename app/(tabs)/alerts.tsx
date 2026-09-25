@@ -15,6 +15,7 @@ import {
   Share2,
 } from 'lucide-react-native';
 import { useAppTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 
 export interface LogisticsControlRoom {
   id: string;
@@ -81,6 +82,7 @@ const CONTROL_ROOMS: LogisticsControlRoom[] = [
 
 export default function AlertsScreen() {
   const { colors, isDark } = useAppTheme();
+  const { t } = useLanguage();
   const [selectedTab, setSelectedTab] = useState<'disruptions' | 'control_desks'>('disruptions');
 
   const handleCall = (number: string) => {
@@ -118,7 +120,7 @@ export default function AlertsScreen() {
         >
           <AlertOctagon size={15} color={selectedTab === 'disruptions' ? '#ffffff' : colors.textSecondary} />
           <Text style={[styles.tabButtonText, { color: selectedTab === 'disruptions' ? '#ffffff' : colors.textSecondary }]}>
-            Corridor Disruption Advisories ({EARLY_WARNING_ALERTS.length})
+            {t.activeWarningsTitle} ({EARLY_WARNING_ALERTS.length})
           </Text>
         </TouchableOpacity>
 
@@ -132,7 +134,7 @@ export default function AlertsScreen() {
         >
           <PhoneCall size={15} color={selectedTab === 'control_desks' ? '#ffffff' : colors.textSecondary} />
           <Text style={[styles.tabButtonText, { color: selectedTab === 'control_desks' ? '#ffffff' : colors.textSecondary }]}>
-            Transport Control Command Desks
+            {t.controlRoomsTitle}
           </Text>
         </TouchableOpacity>
       </View>
@@ -146,10 +148,10 @@ export default function AlertsScreen() {
         {selectedTab === 'disruptions' && (
           <View>
             <Text style={[styles.sectionTitleHeader, { color: colors.textPrimary }]}>
-              Corridor Disruption Advisories & Dynamic Detours
+              {t.alertsTitle}
             </Text>
             <Text style={[styles.sectionSubHeader, { color: colors.textSecondary }]}>
-              Real-time landslide advisories, slope collapse warnings, and dynamic route bypass instructions
+              {t.alertsSub}
             </Text>
 
             {EARLY_WARNING_ALERTS.map((alert) => {
@@ -188,7 +190,7 @@ export default function AlertsScreen() {
                               { color: isRed ? colors.danger : colors.warning },
                             ]}
                           >
-                            {alert.levelText}
+                            {isRed ? t.redAlert : alert.levelText}
                           </Text>
                         </View>
                       </View>
@@ -204,7 +206,7 @@ export default function AlertsScreen() {
 
                   <View style={[styles.advisoryBox, { backgroundColor: isDark ? '#1F2937' : '#F8FAFC' }]}>
                     <Text style={[styles.advisoryLabel, { color: colors.steelBlue }]}>
-                      OFFICIAL DISPATCH ADVISORY:
+                      {t.readOfficialBulletin}:
                     </Text>
                     <Text style={[styles.advisoryText, { color: colors.textSecondary }]}>
                       {alert.authority}
@@ -218,7 +220,7 @@ export default function AlertsScreen() {
                   >
                     <Radio size={14} color="#ffffff" />
                     <Text style={styles.smsBtnText}>
-                      Broadcast SMS Alert to Active Convoys
+                      {t.broadcastSMS}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -231,10 +233,10 @@ export default function AlertsScreen() {
         {selectedTab === 'control_desks' && (
           <View>
             <Text style={[styles.sectionTitleHeader, { color: colors.textPrimary }]}>
-              Emergency Transport & Disaster Control Command Desks
+              {t.controlRoomsTitle}
             </Text>
             <Text style={[styles.sectionSubHeader, { color: colors.textSecondary }]}>
-              1-Tap emergency hotlines for NDRF convoy rescue, BRO highway clearing & state logistics desks
+              {t.alertsSub}
             </Text>
 
             {CONTROL_ROOMS.map((room) => (
@@ -274,7 +276,7 @@ export default function AlertsScreen() {
                   >
                     <PhoneCall size={14} color={colors.danger} />
                     <Text style={[styles.phoneBtnText, { color: colors.danger }]}>
-                      Call {room.primaryPhone}
+                      {t.callEmergency} {room.primaryPhone}
                     </Text>
                   </TouchableOpacity>
 
@@ -286,7 +288,7 @@ export default function AlertsScreen() {
                     >
                       <PhoneCall size={14} color={colors.steelBlue} />
                       <Text style={[styles.phoneBtnText, { color: colors.steelBlue }]}>
-                        Alt: {room.secondaryPhone}
+                        {t.callEmergency} {room.secondaryPhone}
                       </Text>
                     </TouchableOpacity>
                   )}

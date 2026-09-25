@@ -14,6 +14,8 @@ import {
 import { Header } from '../../components/Header';
 import { useAppTheme } from '../../context/ThemeContext';
 import { useAuth, ROLE_CONFIGS } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { SUPPORTED_LANGUAGES, LanguageCode } from '../../services/languageService';
 import { ThemeToggleSwitch } from '../../components/ThemeToggleSwitch';
 import {
   UserRole,
@@ -71,6 +73,7 @@ import {
 
 export default function SettingsScreen() {
   const { theme, colors, isDark, setTheme } = useAppTheme();
+  const { language, setLanguage, t } = useLanguage();
   const {
     user,
     currentRole,
@@ -740,6 +743,61 @@ export default function SettingsScreen() {
           )}
         </View>
 
+        {/* 4.5. Regional Language Selector (11 Languages) */}
+        <View style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <View style={styles.cardHeader}>
+            <View style={[styles.cardHeaderIcon, { backgroundColor: colors.subPanel }]}>
+              <Sparkles size={18} color={colors.steelBlue} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>{t.languageLabel}</Text>
+              <Text style={[styles.cardSubtitle, { color: colors.textMuted }]}>
+                {t.settingsSub}
+              </Text>
+            </View>
+          </View>
+
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+            {SUPPORTED_LANGUAGES.map((lang) => {
+              const isSelected = language === lang.code;
+              return (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={[
+                    {
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      paddingVertical: 8,
+                      paddingHorizontal: 12,
+                      borderRadius: 10,
+                      borderWidth: 1.5,
+                      backgroundColor: isSelected ? colors.steelBlue + '20' : colors.subPanel,
+                      borderColor: isSelected ? colors.steelBlue : colors.border,
+                    },
+                  ]}
+                  onPress={() => setLanguage(lang.code)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontSize: 16 }}>{lang.flag}</Text>
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: isSelected ? '700' : '500',
+                      color: isSelected ? colors.steelBlue : colors.textPrimary,
+                    }}
+                  >
+                    {lang.nativeName}
+                  </Text>
+                  {isSelected && (
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.steelBlue }} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
         {/* 5. Theme Mode Switcher */}
         <View style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.cardHeader}>
@@ -747,9 +805,9 @@ export default function SettingsScreen() {
               {isDark ? <Moon size={18} color={colors.steelBlue} /> : <Sun size={18} color={colors.steelBlue} />}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Appearance & Theme</Text>
+              <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>{t.themeLabel}</Text>
               <Text style={[styles.cardSubtitle, { color: colors.textMuted }]}>
-                {isDark ? 'Dark Mode Active (Low-glare field operations)' : 'Light Mode Active (Daytime high-contrast)'}
+                {isDark ? 'Dark Mode Active' : 'Light Mode Active'}
               </Text>
             </View>
             <ThemeToggleSwitch scale={1.05} />

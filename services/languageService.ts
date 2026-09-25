@@ -1,7 +1,7 @@
 /**
- * Seven Sister States Regional Language Translation Service
- * Supports 11 North Eastern & Regional Languages with 100% Comprehensive Coverage:
- * English, Hindi, Assamese, Bengali, Khasi, Garo, Manipuri, Mizo, Nagamese, Kokborok, Nepali
+ * Regional Language Translation Service
+ * Supports 10 North Eastern & Regional Languages with 100% Comprehensive Coverage:
+ * English, Hindi, Assamese, Bengali, Khasi, Garo, Manipuri, Mizo, Nagamese, Nepali
  */
 
 export type LanguageCode =

@@ -56,7 +56,9 @@ import { requestUserLocationWithChoice, UserLocation } from '../services/locatio
 import { requestNotificationPermission } from '../services/notificationService';
 import { addEmergencyContact } from '../services/emergencyContactsService';
 import { ThemeToggleSwitch } from './ThemeToggleSwitch';
+import { formatBirthdateDisplay, formatBirthdateInputMask } from '../utils/dateFormatters';
 import Svg, { Path } from 'react-native-svg';
+
 
 export const GoogleLogoIcon = ({ size = 18 }: { size?: number }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24">
@@ -152,8 +154,18 @@ export function LoginOnboardingScreen() {
   const [fullName, setFullName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [birthdate, setBirthdate] = useState('');
+<<<<<<< HEAD
   const [bloodGroup, setBloodGroup] = useState('');
   const [photoUri, setPhotoUri] = useState<string>('');
+=======
+  const [showDatePickerModal, setShowDatePickerModal] = useState(false);
+  const [pickerDay, setPickerDay] = useState<number>(2);
+  const [pickerMonth, setPickerMonth] = useState<number>(2);
+  const [pickerYear, setPickerYear] = useState<number>(2006);
+  const [bloodGroup, setBloodGroup] = useState('O+');
+
+  const [photoUri, setPhotoUri] = useState<string>(PRESET_AVATARS[0].url);
+>>>>>>> 2911609 (fix(birthdate): add interactive calendar date picker modal and date display formatting)
 
   // STEP 4: Precise GPS Location & Alerts
   const [isLocating, setIsLocating] = useState(false);
@@ -907,16 +919,36 @@ export function LoginOnboardingScreen() {
 
                   {/* Date of Birth */}
                   <View style={styles.inputGroup}>
-                    <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>Date of Birth (Birthdate)</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <Text style={[styles.inputLabel, { color: colors.textPrimary, marginBottom: 0 }]}>
+                        Date of Birth (Birthdate)
+                      </Text>
+                      {birthdate ? (
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: colors.steelBlue }}>
+                          ✓ {formatBirthdateDisplay(birthdate)}
+                        </Text>
+                      ) : null}
+                    </View>
                     <View style={[styles.inputBox, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-                      <Calendar size={16} color={colors.textMuted} />
+                      <TouchableOpacity onPress={() => setShowDatePickerModal(true)} style={{ paddingRight: 4 }}>
+                        <Calendar size={18} color={colors.steelBlue} />
+                      </TouchableOpacity>
                       <TextInput
                         style={[styles.inputField, { color: colors.textPrimary }]}
-                        placeholder="DD / MM / YYYY"
+                        placeholder="DD / MM / YYYY (e.g. 02 / 02 / 2006)"
                         placeholderTextColor={colors.textMuted}
                         value={birthdate}
-                        onChangeText={setBirthdate}
+                        onChangeText={(val) => setBirthdate(formatBirthdateInputMask(val))}
+                        keyboardType="numeric"
                       />
+                      <TouchableOpacity
+                        style={[styles.calendarPickerTriggerBtn, { backgroundColor: colors.subPanel, borderColor: colors.border }]}
+                        onPress={() => setShowDatePickerModal(true)}
+                        activeOpacity={0.8}
+                      >
+                        <Calendar size={13} color={colors.steelBlue} />
+                        <Text style={[styles.calendarPickerTriggerText, { color: colors.steelBlue }]}>Pick Calendar</Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
 
@@ -1356,7 +1388,11 @@ export function LoginOnboardingScreen() {
                           Role: Citizen Responder
                         </Text>
                         <Text style={[styles.passSubDetail, { color: colors.textMuted }]}>
+<<<<<<< HEAD
                           DOB: {birthdate.trim() || 'Not Specified'} • Blood: {bloodGroup || 'Not Specified'}
+=======
+                          DOB: {formatBirthdateDisplay(birthdate)} • Blood: {bloodGroup}
+>>>>>>> 2911609 (fix(birthdate): add interactive calendar date picker modal and date display formatting)
                         </Text>
                       </View>
                     </View>
@@ -1450,6 +1486,213 @@ export function LoginOnboardingScreen() {
         </View>
       </ScrollView>
       </KeyboardAvoidingView>
+<<<<<<< HEAD
+=======
+
+      {/* Google Account Quick Auth Modal */}
+      <Modal visible={showGoogleAuthModal} transparent animationType="slide" onRequestClose={() => setShowGoogleAuthModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <GoogleLogoIcon size={22} />
+                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Google Sign-In</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowGoogleAuthModal(false)}>
+                <X size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.modalSub, { color: colors.textSecondary }]}>
+              Authorize your Google Account to log in to LOGIX-NER Smart Logistics Grid:
+            </Text>
+
+            <View style={[styles.inputGroup, { marginTop: 10 }]}>
+              <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>Google Email Address</Text>
+              <View style={[styles.inputBox, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+                <Mail size={16} color={colors.steelBlue} />
+                <TextInput
+                  style={[styles.inputField, { color: colors.textPrimary }]}
+                  value={googleAuthEmail}
+                  onChangeText={setGoogleAuthEmail}
+                  placeholder="name@gmail.com"
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.textPrimary }]}>Full Name</Text>
+              <View style={[styles.inputBox, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+                <User size={16} color={colors.steelBlue} />
+                <TextInput
+                  style={[styles.inputField, { color: colors.textPrimary }]}
+                  value={googleAuthName}
+                  onChangeText={setGoogleAuthName}
+                  placeholder="Your Name"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.primaryBtn, { backgroundColor: colors.steelBlue, marginTop: 14 }]}
+              onPress={handleConfirmGoogleAuthModal}
+              activeOpacity={0.85}
+            >
+              <GoogleLogoIcon size={16} />
+              <Text style={styles.primaryBtnText}>Sign In as {googleAuthEmail.split('@')[0] || 'User'}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{ alignItems: 'center', marginTop: 12, paddingVertical: 6 }}
+              onPress={() => setShowGoogleAuthModal(false)}
+            >
+              <Text style={{ fontSize: 11, color: colors.textMuted, fontWeight: '700' }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Date of Birth Interactive Calendar Picker Modal */}
+      <Modal visible={showDatePickerModal} transparent animationType="slide" onRequestClose={() => setShowDatePickerModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { backgroundColor: colors.cardBg, borderColor: colors.border, maxWidth: 440 }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Calendar size={20} color={colors.steelBlue} />
+                <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>Select Date of Birth</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowDatePickerModal(false)}>
+                <X size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Selected Formatted Date Banner */}
+            <View style={[styles.datePreviewBadge, { backgroundColor: colors.subPanel, borderColor: colors.steelBlue }]}>
+              <Text style={[styles.datePreviewText, { color: colors.steelBlue }]}>
+                🗓️ Selected DOB: {formatBirthdateDisplay(`${pickerDay < 10 ? '0' + pickerDay : pickerDay}/${pickerMonth < 10 ? '0' + pickerMonth : pickerMonth}/${pickerYear}`)}
+              </Text>
+            </View>
+
+            <ScrollView style={{ maxHeight: 340, width: '100%' }} showsVerticalScrollIndicator={false}>
+              {/* Quick Age Presets */}
+              <Text style={[styles.datePickerSectionTitle, { color: colors.textPrimary }]}>Quick Age Presets</Text>
+              <View style={styles.datePresetChipsRow}>
+                {[
+                  { label: '🎂 18 yrs (2008)', day: 1, month: 1, year: 2008 },
+                  { label: '🎂 20 yrs (2006)', day: 2, month: 2, year: 2006 },
+                  { label: '🎂 25 yrs (2001)', day: 15, month: 8, year: 2001 },
+                  { label: '🎂 30 yrs (1996)', day: 10, month: 5, year: 1996 },
+                  { label: '🎂 35 yrs (1991)', day: 20, month: 11, year: 1991 },
+                ].map((preset) => (
+                  <TouchableOpacity
+                    key={preset.label}
+                    style={[styles.datePresetChip, { backgroundColor: colors.subPanel, borderColor: colors.border }]}
+                    onPress={() => {
+                      setPickerDay(preset.day);
+                      setPickerMonth(preset.month);
+                      setPickerYear(preset.year);
+                    }}
+                  >
+                    <Text style={[styles.datePresetChipText, { color: colors.textPrimary }]}>{preset.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Year Selector */}
+              <Text style={[styles.datePickerSectionTitle, { color: colors.textPrimary, marginTop: 14 }]}>Birth Year</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                {Array.from({ length: 85 }, (_, i) => 2026 - i).map((y) => {
+                  const isSel = pickerYear === y;
+                  return (
+                    <TouchableOpacity
+                      key={y}
+                      style={[
+                        styles.yearChip,
+                        {
+                          backgroundColor: isSel ? colors.steelBlue : colors.subPanel,
+                          borderColor: isSel ? colors.steelBlue : colors.border,
+                        },
+                      ]}
+                      onPress={() => setPickerYear(y)}
+                    >
+                      <Text style={[styles.yearChipText, { color: isSel ? '#FFFFFF' : colors.textPrimary }]}>{y}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Month Selector */}
+              <Text style={[styles.datePickerSectionTitle, { color: colors.textPrimary }]}>Month</Text>
+              <View style={styles.monthGrid}>
+                {[
+                  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+                ].map((m, idx) => {
+                  const mNum = idx + 1;
+                  const isSel = pickerMonth === mNum;
+                  return (
+                    <TouchableOpacity
+                      key={m}
+                      style={[
+                        styles.monthChip,
+                        {
+                          backgroundColor: isSel ? colors.steelBlue : colors.subPanel,
+                          borderColor: isSel ? colors.steelBlue : colors.border,
+                        },
+                      ]}
+                      onPress={() => setPickerMonth(mNum)}
+                    >
+                      <Text style={[styles.monthChipText, { color: isSel ? '#FFFFFF' : colors.textPrimary }]}>{m}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Day Selector */}
+              <Text style={[styles.datePickerSectionTitle, { color: colors.textPrimary, marginTop: 14 }]}>Day</Text>
+              <View style={styles.dayGrid}>
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => {
+                  const isSel = pickerDay === d;
+                  return (
+                    <TouchableOpacity
+                      key={d}
+                      style={[
+                        styles.dayChip,
+                        {
+                          backgroundColor: isSel ? colors.steelBlue : colors.subPanel,
+                          borderColor: isSel ? colors.steelBlue : colors.border,
+                        },
+                      ]}
+                      onPress={() => setPickerDay(d)}
+                    >
+                      <Text style={[styles.dayChipText, { color: isSel ? '#FFFFFF' : colors.textPrimary }]}>{d}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.primaryBtn, { backgroundColor: colors.steelBlue, marginTop: 14 }]}
+              onPress={() => {
+                const dStr = pickerDay < 10 ? `0${pickerDay}` : `${pickerDay}`;
+                const mStr = pickerMonth < 10 ? `0${pickerMonth}` : `${pickerMonth}`;
+                setBirthdate(`${dStr} / ${mStr} / ${pickerYear}`);
+                setShowDatePickerModal(false);
+              }}
+              activeOpacity={0.85}
+            >
+              <Check size={16} color="#FFFFFF" />
+              <Text style={styles.primaryBtnText}>Confirm Birthdate ({formatBirthdateDisplay(`${pickerDay < 10 ? '0' + pickerDay : pickerDay}/${pickerMonth < 10 ? '0' + pickerMonth : pickerMonth}/${pickerYear}`)})</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+>>>>>>> 2911609 (fix(birthdate): add interactive calendar date picker modal and date display formatting)
     </View>
   );
 }
@@ -2237,4 +2480,99 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginBottom: 6,
   },
+  calendarPickerTriggerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginLeft: 6,
+  },
+  calendarPickerTriggerText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  datePreviewBadge: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  datePreviewText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+  },
+  datePickerSectionTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    marginBottom: 6,
+  },
+  datePresetChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 10,
+  },
+  datePresetChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  datePresetChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  yearChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginRight: 6,
+  },
+  yearChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  monthGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  monthChip: {
+    width: '23%',
+    paddingVertical: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  monthChipText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  dayGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+  },
+  dayChip: {
+    width: '12.5%',
+    paddingVertical: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  dayChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
 });
+

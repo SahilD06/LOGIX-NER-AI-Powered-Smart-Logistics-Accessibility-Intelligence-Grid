@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native';
 import { Header } from '../../components/Header';
+import { formatBirthdateDisplay } from '../../utils/dateFormatters';
 import { useAppTheme } from '../../context/ThemeContext';
 import { useAuth, ROLE_CONFIGS } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -397,7 +398,7 @@ export default function SettingsScreen() {
                   {user?.birthdate ? (
                     <View style={[styles.profileMiniBadge, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
                       <Calendar size={11} color={colors.steelBlue} />
-                      <Text style={[styles.profileMiniText, { color: colors.textPrimary }]}>DOB: {user.birthdate}</Text>
+                      <Text style={[styles.profileMiniText, { color: colors.textPrimary }]}>DOB: {formatBirthdateDisplay(user.birthdate)}</Text>
                     </View>
                   ) : null}
                   {user?.bloodGroup ? (

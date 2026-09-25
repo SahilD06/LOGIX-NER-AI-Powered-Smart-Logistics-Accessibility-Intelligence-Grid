@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Image, Modal, ScrollView, TextInput, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ShieldAlert, PhoneCall, User, FlaskConical, Globe, Mic, MicOff, Volume2, X, Check, Send, Sparkles, Navigation, CloudRain, Shield, AlertTriangle, Home, Radio } from 'lucide-react-native';
@@ -37,10 +37,14 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
   const [showLangModal, setShowLangModal] = useState(false);
   const [showVoiceModal, setShowVoiceModal] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [liveTranscript, setLiveTranscript] = useState<string | null>(null);
+  const [micVolume, setMicVolume] = useState<number>(0);
   const [voiceQueryText, setVoiceQueryText] = useState('');
   const [voiceResponse, setVoiceResponse] = useState<string | null>(null);
   const [voiceStatusNotice, setVoiceStatusNotice] = useState<string | null>(null);
-  const [pulseAnim] = useState(new Animated.Value(1));
+
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const volAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     setCurrentLangState(getSelectedLanguage());
@@ -52,12 +56,12 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
         Animated.sequence([
           Animated.timing(pulseAnim, {
             toValue: 1.25,
-            duration: 400,
+            duration: 500,
             useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
             toValue: 1,
-            duration: 400,
+            duration: 500,
             useNativeDriver: true,
           }),
         ])
@@ -66,6 +70,15 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
       pulseAnim.setValue(1);
     }
   }, [isListening]);
+
+  useEffect(() => {
+    const targetScale = 1 + (micVolume / 100) * 0.4;
+    Animated.spring(volAnim, {
+      toValue: targetScale,
+      useNativeDriver: true,
+      friction: 4,
+    }).start();
+  }, [micVolume]);
 
   const t = getTranslations(currentLang);
   const activeLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === currentLang) || SUPPORTED_LANGUAGES[0];
@@ -78,30 +91,41 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
 
   const openVoiceAssistant = () => {
     setShowVoiceModal(true);
+    setLiveTranscript(null);
     startListening();
   };
 
   const startListening = () => {
     setIsListening(true);
-    setVoiceStatusNotice('Listening... Speak clearly into your microphone.');
+    setLiveTranscript(null);
+    setVoiceStatusNotice('Listening... Speak into your microphone.');
 
     listenForVoiceCommand(
       (result: VoiceRecognitionResult) => {
         setIsListening(false);
+        setLiveTranscript(null);
         setVoiceStatusNotice(null);
         setVoiceResponse(result.feedbackResponse);
       },
       (status, errorMsg) => {
         if (status === 'error') {
           setIsListening(false);
-          setVoiceStatusNotice(errorMsg || 'Microphone offline. Type or tap an option below.');
+          setVoiceStatusNotice(errorMsg || 'Microphone inactive. Type or select a quick option.');
         } else if (status === 'stopped') {
           setIsListening(false);
           setVoiceStatusNotice(null);
         } else if (status === 'listening') {
           setIsListening(true);
           setVoiceStatusNotice('🎙️ Listening... Speak your query.');
+        } else if (status === 'processing') {
+          setVoiceStatusNotice('⚡ Processing your voice...');
         }
+      },
+      (interim) => {
+        setLiveTranscript(interim);
+      },
+      (vol) => {
+        setMicVolume(vol);
       }
     );
   };
@@ -109,7 +133,9 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
   const handleStopListening = () => {
     stopActiveVoiceRecognition();
     setIsListening(false);
+    setLiveTranscript(null);
     setVoiceStatusNotice(null);
+    setMicVolume(0);
   };
 
   const handleExecuteCustomQuery = (query: string) => {
@@ -230,7 +256,7 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
                 </View>
                 <View>
                   <Text style={[styles.voiceModalTitle, { color: colors.textPrimary }]}>LOGIX Voice AI Assistant</Text>
-                  <Text style={[styles.voiceModalSubtitle, { color: colors.steelBlue }]}>Seven Sisters Regional Grid</Text>
+                  <Text style={[styles.voiceModalSubtitle, { color: colors.steelBlue }]}>Seven Sisters Regional Voice Grid</Text>
                 </View>
               </View>
               <TouchableOpacity onPress={() => { handleStopListening(); setShowVoiceModal(false); }}>
@@ -238,9 +264,18 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
               </TouchableOpacity>
             </View>
 
-            {/* Central Animated Mic Button */}
+            {/* Central Animated Mic & Audio Visualizer Area */}
             <View style={styles.micCenterArea}>
-              <Animated.View style={[styles.micBigPulseCircle, { transform: [{ scale: pulseAnim }], borderColor: isListening ? colors.danger : colors.steelBlue }]}>
+              <Animated.View
+                style={[
+                  styles.micBigPulseCircle,
+                  {
+                    transform: [{ scale: isListening ? volAnim : pulseAnim }],
+                    borderColor: isListening ? colors.danger : colors.steelBlue,
+                    backgroundColor: isListening ? colors.dangerBg : colors.subPanel,
+                  },
+                ]}
+              >
                 <TouchableOpacity
                   style={[
                     styles.micBigButton,
@@ -252,14 +287,22 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
                   {isListening ? <Mic size={32} color="#ffffff" /> : <MicOff size={30} color="#ffffff" />}
                 </TouchableOpacity>
               </Animated.View>
+
               <Text style={[styles.micStatusLabel, { color: isListening ? colors.danger : colors.textPrimary }]}>
-                {isListening ? 'Listening for speech...' : 'Tap Mic to Speak'}
+                {isListening ? '🎙️ Listening... Speak Now' : 'Tap Mic to Speak'}
               </Text>
-              {voiceStatusNotice && (
+
+              {/* Live Interim Transcript Display */}
+              {liveTranscript ? (
+                <View style={[styles.liveTranscriptBox, { backgroundColor: colors.subPanel, borderColor: colors.steelBlue }]}>
+                  <Text style={[styles.liveTranscriptLabel, { color: colors.steelBlue }]}>HEARING:</Text>
+                  <Text style={[styles.liveTranscriptText, { color: colors.textPrimary }]}>"{liveTranscript}"</Text>
+                </View>
+              ) : voiceStatusNotice ? (
                 <Text style={[styles.voiceNoticeText, { color: colors.textSecondary }]}>
                   {voiceStatusNotice}
                 </Text>
-              )}
+              ) : null}
             </View>
 
             {/* Spoken AI Response Box */}
@@ -271,7 +314,7 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
                     <Text style={[styles.responseLabel, { color: colors.steelBlue }]}>AI Spoken Response</Text>
                   </View>
                   <TouchableOpacity onPress={() => executeVoiceCommand(voiceResponse)}>
-                    <Text style={[styles.replayText, { color: colors.steelBlue }]}>🔊 Replay</Text>
+                    <Text style={[styles.replayText, { color: colors.steelBlue }]}>🔊 Replay Audio</Text>
                   </TouchableOpacity>
                 </View>
                 <Text style={[styles.responseTextContent, { color: colors.textPrimary }]}>
@@ -545,21 +588,21 @@ const styles = StyleSheet.create({
   micCenterArea: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   micBigPulseCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 86,
+    height: 86,
+    borderRadius: 43,
     borderWidth: 2.5,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
   },
   micBigButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 66,
+    height: 66,
+    borderRadius: 33,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 4,
@@ -567,6 +610,26 @@ const styles = StyleSheet.create({
   micStatusLabel: {
     fontSize: 13,
     fontWeight: '800',
+    marginTop: 2,
+  },
+  liveTranscriptBox: {
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginTop: 8,
+    alignItems: 'center',
+    maxWidth: '92%',
+  },
+  liveTranscriptLabel: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  liveTranscriptText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    textAlign: 'center',
     marginTop: 2,
   },
   voiceNoticeText: {

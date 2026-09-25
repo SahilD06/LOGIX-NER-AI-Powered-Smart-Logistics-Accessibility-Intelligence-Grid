@@ -42,9 +42,11 @@ const DISTRESS_KEYWORDS: Record<string, string[]> = {
 };
 
 let activeRecognition: any = null;
+let activeAudioStream: MediaStream | null = null;
+let activeAudioContext: AudioContext | null = null;
 
 /**
- * Cleanly cancel any active voice recognition session
+ * Cleanly cancel any active voice recognition session & audio tracks
  */
 export function stopActiveVoiceRecognition(): void {
   if (activeRecognition) {
@@ -52,6 +54,18 @@ export function stopActiveVoiceRecognition(): void {
       activeRecognition.abort();
     } catch {}
     activeRecognition = null;
+  }
+  if (activeAudioStream) {
+    try {
+      activeAudioStream.getTracks().forEach((track) => track.stop());
+    } catch {}
+    activeAudioStream = null;
+  }
+  if (activeAudioContext && activeAudioContext.state !== 'closed') {
+    try {
+      activeAudioContext.close();
+    } catch {}
+    activeAudioContext = null;
   }
 }
 
@@ -72,11 +86,13 @@ export function executeVoiceCommand(commandText: string, onResult?: (res: VoiceR
 }
 
 /**
- * Speech Recognition Listener using Web Speech API
+ * Speech Recognition Listener with Live Interim Transcripts & Volume Level Visualizer
  */
 export function listenForVoiceCommand(
   onResult: (res: VoiceRecognitionResult) => void,
-  onStatusChange?: (status: 'listening' | 'processing' | 'stopped' | 'error', errorMsg?: string) => void
+  onStatusChange?: (status: 'listening' | 'processing' | 'stopped' | 'error', errorMsg?: string) => void,
+  onInterimText?: (interimText: string) => void,
+  onVolumeChange?: (volume: number) => void
 ): () => void {
   stopActiveVoiceRecognition();
 
@@ -87,40 +103,121 @@ export function listenForVoiceCommand(
     playWarningBeep();
   } catch {}
 
+  // 1. Start audio visualizer if volume listener is attached
+  if (onVolumeChange && navigator?.mediaDevices?.getUserMedia) {
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
+        activeAudioStream = stream;
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const audioCtx = new AudioCtx();
+          activeAudioContext = audioCtx;
+          const source = audioCtx.createMediaStreamSource(stream);
+          const analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 64;
+          source.connect(analyser);
+
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          const updateVolume = () => {
+            if (!activeAudioStream) return;
+            analyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+              sum += dataArray[i];
+            }
+            const avg = sum / dataArray.length;
+            onVolumeChange(Math.min(100, Math.round((avg / 128) * 100)));
+            requestAnimationFrame(updateVolume);
+          };
+          updateVolume();
+        }
+      })
+      .catch((e) => {
+        console.warn('Audio meter stream notice:', e);
+      });
+  }
+
+  // 2. Start Web Speech Recognition
   const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
   if (!SpeechRecognition) {
     if (onStatusChange) onStatusChange('error', 'Voice recognition is not supported in this browser. Please use Chrome/Edge or tap a command.');
-    return () => {};
+    return () => stopActiveVoiceRecognition();
   }
 
   try {
     const recognition = new SpeechRecognition();
     activeRecognition = recognition;
 
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    // Set standard English/Indian locale to avoid browser language-pack crashes
-    const lang = getSelectedLanguage();
-    recognition.lang = lang === 'hi' ? 'hi-IN' : lang === 'bn' ? 'bn-IN' : 'en-IN';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    // Use system or language-aware locale with fallback
+    const selected = getSelectedLanguage();
+    if (selected === 'hi') {
+      recognition.lang = 'hi-IN';
+    } else if (selected === 'bn') {
+      recognition.lang = 'bn-IN';
+    } else {
+      recognition.lang = navigator.language || 'en-US';
+    }
+
+    let finalTranscriptReceived = false;
+    let silenceTimer: any = null;
 
     if (onStatusChange) onStatusChange('listening');
 
     recognition.onresult = (event: any) => {
-      const transcript = event.results?.[0]?.[0]?.transcript || '';
-      if (transcript.trim()) {
-        if (onStatusChange) onStatusChange('processing');
-        executeVoiceCommand(transcript, onResult);
+      let interim = '';
+      let final = '';
+
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        const text = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          final += text;
+        } else {
+          interim += text;
+        }
       }
-      if (onStatusChange) onStatusChange('stopped');
+
+      const activeText = final.trim() || interim.trim();
+      if (activeText && onInterimText) {
+        onInterimText(activeText);
+      }
+
+      if (final.trim()) {
+        finalTranscriptReceived = true;
+        if (onStatusChange) onStatusChange('processing');
+        executeVoiceCommand(final.trim(), onResult);
+        stopActiveVoiceRecognition();
+        if (onStatusChange) onStatusChange('stopped');
+      } else if (interim.trim()) {
+        // If user pauses after speaking interim words, process after 1.8s
+        clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(() => {
+          if (!finalTranscriptReceived && interim.trim()) {
+            finalTranscriptReceived = true;
+            if (onStatusChange) onStatusChange('processing');
+            executeVoiceCommand(interim.trim(), onResult);
+            stopActiveVoiceRecognition();
+            if (onStatusChange) onStatusChange('stopped');
+          }
+        }, 1800);
+      }
     };
 
     recognition.onerror = (event: any) => {
       const err = event?.error;
       console.warn('Speech recognition notice:', err);
 
-      if (err === 'aborted' || err === 'no-speech') {
-        if (onStatusChange) onStatusChange('stopped');
+      if (err === 'aborted') {
+        return;
+      }
+
+      if (err === 'no-speech') {
+        // Don't treat silence as fatal; keep listening
         return;
       }
 
@@ -130,27 +227,27 @@ export function listenForVoiceCommand(
       }
 
       if (err === 'network') {
-        if (onStatusChange) onStatusChange('error', '🎙️ Browser speech cloud is offline. Tap any command below or retry.');
+        if (onStatusChange) onStatusChange('error', '🎙️ Speech server connection offline. Tap any command or type below.');
         return;
       }
-
-      if (onStatusChange) onStatusChange('stopped');
     };
 
     recognition.onend = () => {
-      activeRecognition = null;
-      if (onStatusChange) onStatusChange('stopped');
+      if (activeRecognition && !finalTranscriptReceived) {
+        // Keep active session if not explicitly stopped
+      }
     };
 
     recognition.start();
 
     return () => {
+      clearTimeout(silenceTimer);
       stopActiveVoiceRecognition();
     };
   } catch (e: any) {
     console.warn('Speech recognition startup exception:', e);
-    if (onStatusChange) onStatusChange('stopped');
-    return () => {};
+    if (onStatusChange) onStatusChange('error', 'Unable to start microphone.');
+    return () => stopActiveVoiceRecognition();
   }
 }
 

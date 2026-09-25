@@ -58,9 +58,9 @@ export function stopActiveVoiceRecognition(): void {
 /**
  * Execute a recognized voice command or quick action
  */
-export function executeVoiceCommand(commandText: string, onResult: (res: VoiceRecognitionResult) => void): VoiceRecognitionResult {
+export function executeVoiceCommand(commandText: string, onResult?: (res: VoiceRecognitionResult) => void): VoiceRecognitionResult {
   const result = analyzeSpokenText(commandText);
-  onResult(result);
+  if (onResult) onResult(result);
 
   if (result.isPanicCommand) {
     playEmergencySiren(4000);
@@ -73,12 +73,11 @@ export function executeVoiceCommand(commandText: string, onResult: (res: VoiceRe
 
 /**
  * Speech Recognition Listener using Web Speech API
- * Only triggers actions when actual speech is captured.
  */
-export async function listenForVoiceCommand(
+export function listenForVoiceCommand(
   onResult: (res: VoiceRecognitionResult) => void,
   onStatusChange?: (status: 'listening' | 'processing' | 'stopped' | 'error', errorMsg?: string) => void
-): Promise<() => void> {
+): () => void {
   stopActiveVoiceRecognition();
 
   if (typeof window === 'undefined') return () => {};
@@ -91,21 +90,8 @@ export async function listenForVoiceCommand(
   const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
   if (!SpeechRecognition) {
-    if (onStatusChange) onStatusChange('error', 'Voice recognition is not supported in this browser. Please use Chrome/Edge or tap a quick action below.');
+    if (onStatusChange) onStatusChange('error', 'Voice recognition is not supported in this browser. Please use Chrome/Edge or tap a command.');
     return () => {};
-  }
-
-  // Request browser microphone permission if possible
-  if (navigator?.mediaDevices?.getUserMedia) {
-    try {
-      await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch (permErr: any) {
-      console.warn('Microphone permission request:', permErr);
-      if (permErr?.name === 'NotAllowedError' || permErr?.name === 'PermissionDeniedError') {
-        if (onStatusChange) onStatusChange('error', '🎙️ Please allow microphone access in browser settings.');
-        return () => {};
-      }
-    }
   }
 
   try {
@@ -114,7 +100,9 @@ export async function listenForVoiceCommand(
 
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.lang = getLanguageLocale(getSelectedLanguage());
+    // Set standard English/Indian locale to avoid browser language-pack crashes
+    const lang = getSelectedLanguage();
+    recognition.lang = lang === 'hi' ? 'hi-IN' : lang === 'bn' ? 'bn-IN' : 'en-IN';
 
     if (onStatusChange) onStatusChange('listening');
 
@@ -129,7 +117,7 @@ export async function listenForVoiceCommand(
 
     recognition.onerror = (event: any) => {
       const err = event?.error;
-      console.warn('Speech recognition event:', err);
+      console.warn('Speech recognition notice:', err);
 
       if (err === 'aborted' || err === 'no-speech') {
         if (onStatusChange) onStatusChange('stopped');
@@ -137,12 +125,12 @@ export async function listenForVoiceCommand(
       }
 
       if (err === 'not-allowed' || err === 'permission-denied') {
-        if (onStatusChange) onStatusChange('error', '🎙️ Mic permission denied. Enable microphone in browser settings.');
+        if (onStatusChange) onStatusChange('error', '🎙️ Microphone permission required. Enable mic in your browser address bar.');
         return;
       }
 
       if (err === 'network') {
-        if (onStatusChange) onStatusChange('error', '🎙️ Voice network timeout. Tap a quick command or try speaking again.');
+        if (onStatusChange) onStatusChange('error', '🎙️ Browser speech cloud is offline. Tap any command below or retry.');
         return;
       }
 
@@ -160,7 +148,7 @@ export async function listenForVoiceCommand(
       stopActiveVoiceRecognition();
     };
   } catch (e: any) {
-    console.warn('Speech recognition startup error:', e);
+    console.warn('Speech recognition startup exception:', e);
     if (onStatusChange) onStatusChange('stopped');
     return () => {};
   }
@@ -193,7 +181,7 @@ export function analyzeSpokenText(transcript: string): VoiceRecognitionResult {
       actionType: 'SOS',
       spokenText: transcript,
       detectedLanguage: matchedLang,
-      feedbackResponse: '🚨 Emergency Distress Detected! Siren activated & GPS SOS dispatched to NDRF 1078.',
+      feedbackResponse: '🚨 Emergency Distress Detected! High Siren Activated & GPS SOS Dispatched to NDRF 1078.',
     };
   }
 
@@ -203,7 +191,7 @@ export function analyzeSpokenText(transcript: string): VoiceRecognitionResult {
       actionType: 'ALERTS',
       spokenText: transcript,
       detectedLanguage: matchedLang,
-      feedbackResponse: '⚠️ High Risk Warning: East Khasi & South Garo Hills. Rainfall 140mm/24h. Evacuate unstable slopes.',
+      feedbackResponse: '⚠️ High Hazard Warning: East Khasi & South Garo Hills. Rainfall 140mm/24h. Evacuate unstable slopes.',
     };
   }
 
@@ -213,7 +201,7 @@ export function analyzeSpokenText(transcript: string): VoiceRecognitionResult {
       actionType: 'HELPLINES',
       spokenText: transcript,
       detectedLanguage: matchedLang,
-      feedbackResponse: '📞 Emergency Lines: National 112, NDRF 1078, State Disaster Operation 1070.',
+      feedbackResponse: '📞 Emergency Hotlines: National 112, NDRF 1078, State Disaster Operation 1070.',
     };
   }
 
@@ -233,7 +221,7 @@ export function analyzeSpokenText(transcript: string): VoiceRecognitionResult {
       actionType: 'WEATHER',
       spokenText: transcript,
       detectedLanguage: matchedLang,
-      feedbackResponse: '🌧️ Weather Alert: Heavy monsoon downpour across Meghalaya & Sikkim. Slope saturation at 87%.',
+      feedbackResponse: '🌧️ Weather Advisory: Heavy monsoon downpour continuing across Meghalaya & Sikkim. Slope saturation 87%.',
     };
   }
 
@@ -252,7 +240,7 @@ export function analyzeSpokenText(transcript: string): VoiceRecognitionResult {
     actionType: 'UNKNOWN',
     spokenText: transcript,
     detectedLanguage: matchedLang,
-    feedbackResponse: `Heard: "${transcript}". Say "Help", "Bachao", "Shelters", or "SOS" for emergency action.`,
+    feedbackResponse: `Heard: "${transcript}". Ask about "Shelters", "Weather", "Road Status", or say "Help SOS".`,
   };
 }
 
@@ -264,20 +252,11 @@ export function speakTextOutLoud(text: string, langCode: LanguageCode = getSelec
   try {
     window.speechSynthesis.cancel(); // Stop current speech
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = getLanguageLocale(langCode);
+    utterance.lang = langCode === 'hi' ? 'hi-IN' : langCode === 'bn' ? 'bn-IN' : 'en-IN';
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
     window.speechSynthesis.speak(utterance);
   } catch (e) {
     console.warn('Text-to-Speech notice:', e);
-  }
-}
-
-function getLanguageLocale(code: LanguageCode): string {
-  switch (code) {
-    case 'hi': return 'hi-IN';
-    case 'bn': return 'bn-IN';
-    case 'en': return 'en-IN';
-    default: return 'en-IN'; // Default to en-IN for universal Web Speech API support
   }
 }

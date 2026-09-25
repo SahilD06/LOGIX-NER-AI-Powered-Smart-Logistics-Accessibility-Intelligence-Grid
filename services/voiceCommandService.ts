@@ -35,8 +35,6 @@ const DISTRESS_KEYWORDS: Record<string, string[]> = {
   mzo: ['tanpui', 'puih', 'hlamau', 'min', 'lirtu'],
   // Nagamese
   nag: ['holep', 'bipod', 'khatra', 'bachabo'],
-  // Kokborok
-  kok: ['chuba', 'kwtal', 'hachuk', 'dok'],
   // Nepali
   ne: ['गुहार', 'बचाऊ', 'पहिरो', 'खतरा', 'आपत', 'guhar', 'bachau', 'pahiro'],
 };

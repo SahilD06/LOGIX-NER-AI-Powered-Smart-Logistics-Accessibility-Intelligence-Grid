@@ -294,10 +294,7 @@ export const Header: React.FC<HeaderProps> = () => {
                     <Text style={styles.langOptionFlag}>{item.flag}</Text>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.langOptionName, { color: colors.textPrimary }]}>
-                        {item.name} ({item.nativeName})
-                      </Text>
-                      <Text style={[styles.langOptionRegion, { color: colors.textMuted }]}>
-                        Region: {item.region}
+                        {item.name === item.nativeName ? item.name : `${item.nativeName} (${item.name})`}
                       </Text>
                     </View>
                     {isSelected && <Check size={18} color={colors.steelBlue} />}

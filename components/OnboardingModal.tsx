@@ -196,10 +196,7 @@ export function OnboardingModal() {
                       <Text style={styles.flagText}>{item.flag}</Text>
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.langName, { color: colors.textPrimary }]}>
-                          {item.name} ({item.nativeName})
-                        </Text>
-                        <Text style={[styles.langRegion, { color: colors.textMuted }]}>
-                          {item.region}
+                          {item.name === item.nativeName ? item.name : `${item.nativeName} (${item.name})`}
                         </Text>
                       </View>
                       {isSelected && <Check size={20} color={colors.steelBlue} />}

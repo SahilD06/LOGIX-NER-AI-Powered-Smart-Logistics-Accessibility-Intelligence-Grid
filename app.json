@@ -10,6 +10,28 @@
       "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "in.logixner.disastergrid",
+      "infoPlist": {
+        "NSCameraUsageDescription": "LOGIX-NER requires camera access to snap live geotagged hazard photos for AI vision verification.",
+        "NSPhotoLibraryUsageDescription": "LOGIX-NER requires photo library access to upload field evidence.",
+        "NSLocationWhenInUseUsageDescription": "LOGIX-NER requires location access to pinpoint exact GPS sector coordinates for disaster response.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "LOGIX-NER requires location access to provide real-time landslide route detour alerts.",
+        "NSMicrophoneUsageDescription": "LOGIX-NER requires microphone access for regional voice panic commands."
+      }
+    },
+    "android": {
+      "package": "in.logixner.disastergrid",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "RECORD_AUDIO"
+      ]
+    },
     "plugins": [
       "expo-router"
     ],

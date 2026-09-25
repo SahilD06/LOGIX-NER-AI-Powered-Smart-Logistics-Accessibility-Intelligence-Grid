@@ -59,6 +59,7 @@ import {
   Calendar,
   Droplet,
   MapPin,
+  Check,
 } from 'lucide-react-native';
 import {
   getSavedEmergencyContacts,
@@ -69,7 +70,7 @@ import {
 } from '../../services/emergencyContactsService';
 
 export default function SettingsScreen() {
-  const { theme, colors, isDark } = useAppTheme();
+  const { theme, colors, isDark, setTheme } = useAppTheme();
   const {
     user,
     currentRole,
@@ -743,21 +744,94 @@ export default function SettingsScreen() {
         <View style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.cardHeader}>
             <View style={[styles.cardHeaderIcon, { backgroundColor: colors.subPanel }]}>
-              <Sun size={18} color={colors.steelBlue} />
+              {isDark ? <Moon size={18} color={colors.steelBlue} /> : <Sun size={18} color={colors.steelBlue} />}
             </View>
-            <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Appearance & Theme</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>Appearance & Theme</Text>
+              <Text style={[styles.cardSubtitle, { color: colors.textMuted }]}>
+                {isDark ? 'Dark Mode Active (Low-glare field operations)' : 'Light Mode Active (Daytime high-contrast)'}
+              </Text>
+            </View>
+            <ThemeToggleSwitch scale={1.05} />
           </View>
 
-          <View style={styles.switchToggleRow}>
-            <View style={styles.switchToggleTextCol}>
-              <Text style={[styles.switchToggleTitle, { color: colors.textPrimary }]}>
-                {isDark ? 'Dark Mode Active' : 'Light Mode Active'}
-              </Text>
-              <Text style={[styles.switchToggleSubtitle, { color: colors.textSecondary }]}>
-                Toggle between daytime high-contrast and low-light field operations
-              </Text>
-            </View>
-            <ThemeToggleSwitch scale={1.1} />
+          {/* Dual Visual Mode Selector Cards */}
+          <View style={styles.themeSelectorGrid}>
+            <TouchableOpacity
+              style={[
+                styles.themeOptionCard,
+                {
+                  backgroundColor: !isDark ? colors.subPanel : colors.cardBg,
+                  borderColor: !isDark ? colors.steelBlue : colors.border,
+                  borderWidth: !isDark ? 2 : 1,
+                },
+              ]}
+              onPress={() => setTheme('light')}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.themeOptionPreview, { backgroundColor: '#F1F5F9', borderColor: '#CBD5E1' }]}>
+                <View style={[styles.themeMiniBar, { backgroundColor: '#FFFFFF' }]} />
+                <View style={[styles.themeMiniCard, { backgroundColor: '#FFFFFF' }]}>
+                  <View style={[styles.themeMiniLine, { backgroundColor: '#0284C7', width: '45%' }]} />
+                  <View style={[styles.themeMiniLine, { backgroundColor: '#94A3B8', width: '75%' }]} />
+                </View>
+              </View>
+
+              <View style={styles.themeOptionInfo}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Sun size={16} color="#F59E0B" />
+                    <Text style={[styles.themeOptionTitle, { color: colors.textPrimary }]}>Light Mode</Text>
+                  </View>
+                  {!isDark && (
+                    <View style={[styles.themeActiveBadge, { backgroundColor: colors.steelBlue }]}>
+                      <Check size={12} color="#FFFFFF" />
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.themeOptionDesc, { color: colors.textSecondary }]}>
+                  Daytime high-contrast
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.themeOptionCard,
+                {
+                  backgroundColor: isDark ? colors.subPanel : colors.cardBg,
+                  borderColor: isDark ? colors.steelBlue : colors.border,
+                  borderWidth: isDark ? 2 : 1,
+                },
+              ]}
+              onPress={() => setTheme('dark')}
+              activeOpacity={0.85}
+            >
+              <View style={[styles.themeOptionPreview, { backgroundColor: '#090D16', borderColor: '#374151' }]}>
+                <View style={[styles.themeMiniBar, { backgroundColor: '#111827' }]} />
+                <View style={[styles.themeMiniCard, { backgroundColor: '#1F2937' }]}>
+                  <View style={[styles.themeMiniLine, { backgroundColor: '#38BDF8', width: '45%' }]} />
+                  <View style={[styles.themeMiniLine, { backgroundColor: '#6B7280', width: '75%' }]} />
+                </View>
+              </View>
+
+              <View style={styles.themeOptionInfo}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Moon size={16} color="#38BDF8" />
+                    <Text style={[styles.themeOptionTitle, { color: colors.textPrimary }]}>Dark Mode</Text>
+                  </View>
+                  {isDark && (
+                    <View style={[styles.themeActiveBadge, { backgroundColor: colors.steelBlue }]}>
+                      <Check size={12} color="#FFFFFF" />
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.themeOptionDesc, { color: colors.textSecondary }]}>
+                  Low-light night operations
+                </Text>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -1569,5 +1643,58 @@ const styles = StyleSheet.create({
   testSmsBroadcastText: {
     fontSize: 12,
     fontWeight: '900',
+  },
+  themeSelectorGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 14,
+  },
+  themeOptionCard: {
+    flex: 1,
+    borderRadius: 14,
+    padding: 12,
+    gap: 10,
+  },
+  themeOptionPreview: {
+    height: 64,
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 6,
+    gap: 5,
+    overflow: 'hidden',
+  },
+  themeMiniBar: {
+    height: 8,
+    borderRadius: 4,
+    width: '100%',
+  },
+  themeMiniCard: {
+    flex: 1,
+    borderRadius: 6,
+    padding: 6,
+    gap: 4,
+    justifyContent: 'center',
+  },
+  themeMiniLine: {
+    height: 4,
+    borderRadius: 2,
+  },
+  themeOptionInfo: {
+    gap: 2,
+  },
+  themeOptionTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  themeOptionDesc: {
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  themeActiveBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

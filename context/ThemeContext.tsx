@@ -95,14 +95,31 @@ const ThemeContext = createContext<ThemeContextType>({
 });
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<ThemeMode>('light');
+  const [theme, setThemeState] = useState<ThemeMode>(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const saved = window.localStorage.getItem('rakshak_theme_mode');
+      if (saved === 'light' || saved === 'dark') {
+        return saved;
+      }
+    }
+    return 'light';
+  });
 
   const setTheme = (mode: ThemeMode) => {
     setThemeState(mode);
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem('rakshak_theme_mode', mode);
+    }
   };
 
   const toggleTheme = () => {
-    setThemeState((prev) => (prev === 'light' ? 'dark' : 'light'));
+    setThemeState((prev) => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem('rakshak_theme_mode', next);
+      }
+      return next;
+    });
   };
 
   const isDark = theme === 'dark';

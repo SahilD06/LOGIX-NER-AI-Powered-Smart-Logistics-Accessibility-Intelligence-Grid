@@ -47,3 +47,4 @@ nativewind-env.d.ts
 /ios
 /android
 .vercel
+.env*

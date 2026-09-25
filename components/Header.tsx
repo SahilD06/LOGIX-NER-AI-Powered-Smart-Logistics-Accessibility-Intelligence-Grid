@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform, Image, Modal, ScrollView, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ShieldAlert, PhoneCall, User, FlaskConical, Globe, Mic, MicOff, Volume2, X, Check, Radio } from 'lucide-react-native';
+import { ShieldAlert, PhoneCall, User, FlaskConical, Globe, Mic, MicOff, Volume2, X, Check, Sparkles, Navigation, CloudRain, Shield } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useAppTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -16,6 +16,7 @@ import {
 import {
   listenForVoiceCommand,
   stopActiveVoiceRecognition,
+  executeVoiceCommand,
   VoiceRecognitionResult,
 } from '../services/voiceCommandService';
 
@@ -48,13 +49,13 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
-            toValue: 1.25,
-            duration: 500,
+            toValue: 1.2,
+            duration: 400,
             useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
             toValue: 1,
-            duration: 500,
+            duration: 400,
             useNativeDriver: true,
           }),
         ])
@@ -73,18 +74,17 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
     setShowLangModal(false);
   };
 
-  const handleToggleVoiceAssistant = () => {
+  const handleToggleVoiceAssistant = async () => {
     if (isListening) {
       stopActiveVoiceRecognition();
       setIsListening(false);
-      setVoiceFeedback(null);
       return;
     }
 
     setIsListening(true);
     setVoiceFeedback(null);
 
-    listenForVoiceCommand(
+    await listenForVoiceCommand(
       (result: VoiceRecognitionResult) => {
         setIsListening(false);
         setVoiceFeedback(result.feedbackResponse);
@@ -93,13 +93,22 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
       (status, errorMsg) => {
         if (status === 'error') {
           setIsListening(false);
-          setVoiceFeedback(errorMsg || '⚠️ Microphone unavailable. Tap to retry.');
-          setTimeout(() => setVoiceFeedback(null), 5000);
+          setVoiceFeedback(errorMsg || '🎙️ Speak your emergency command or tap below.');
+          setTimeout(() => setVoiceFeedback(null), 6000);
         } else if (status === 'stopped') {
           setIsListening(false);
         }
       }
     );
+  };
+
+  const handleQuickCommand = (cmd: string) => {
+    stopActiveVoiceRecognition();
+    setIsListening(false);
+    executeVoiceCommand(cmd, (res) => {
+      setVoiceFeedback(res.feedbackResponse);
+      setTimeout(() => setVoiceFeedback(null), 8000);
+    });
   };
 
   return (
@@ -204,18 +213,58 @@ export const Header: React.FC<HeaderProps> = ({ onRefresh }) => {
         </View>
       </View>
 
-      {/* Active Recording / Listening Indicator Banner */}
+      {/* Active Recording / Listening Indicator Banner with Quick Pills */}
       {isListening && (
-        <View style={[styles.activeListeningBanner, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]}>
-          <View style={styles.listeningLeftCol}>
-            <Animated.View style={[styles.recordingDot, { transform: [{ scale: pulseAnim }] }]} />
-            <Text style={[styles.activeListeningText, { color: colors.danger }]}>
-              🎙️ {t.listeningVoice || 'Listening...'} <Text style={styles.listeningHint}>Say "Help", "Bachao", "SOS", "Shelters", "Weather"</Text>
-            </Text>
+        <View style={[styles.voiceActiveCard, { backgroundColor: colors.subPanel, borderColor: colors.border }]}>
+          <View style={styles.voiceActiveHeader}>
+            <View style={styles.listeningLeftCol}>
+              <Animated.View style={[styles.recordingDot, { transform: [{ scale: pulseAnim }] }]} />
+              <Text style={[styles.activeListeningText, { color: colors.danger }]}>
+                🎙️ {t.listeningVoice || 'Listening...'} <Text style={[styles.listeningHint, { color: colors.textSecondary }]}>Speak or tap quick command:</Text>
+              </Text>
+            </View>
+            <TouchableOpacity onPress={handleToggleVoiceAssistant} style={[styles.cancelVoiceBtn, { borderColor: colors.dangerBorder, backgroundColor: colors.dangerBg }]}>
+              <Text style={[styles.cancelVoiceText, { color: colors.danger }]}>Done</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={handleToggleVoiceAssistant} style={[styles.cancelVoiceBtn, { borderColor: colors.dangerBorder }]}>
-            <Text style={[styles.cancelVoiceText, { color: colors.danger }]}>Cancel</Text>
-          </TouchableOpacity>
+
+          {/* Quick Voice Command Chips */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickChipsScroll}>
+            <TouchableOpacity
+              style={[styles.quickChip, { backgroundColor: colors.dangerBg, borderColor: colors.dangerBorder }]}
+              onPress={() => handleQuickCommand('Help! Bachao! SOS Emergency')}
+            >
+              <Text style={[styles.quickChipText, { color: colors.danger }]}>🚨 Help / SOS</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.quickChip, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+              onPress={() => handleQuickCommand('Where are the nearest relief shelters?')}
+            >
+              <Text style={[styles.quickChipText, { color: colors.textPrimary }]}>🏠 Shelters</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.quickChip, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+              onPress={() => handleQuickCommand('What is the weather and rain forecast?')}
+            >
+              <Text style={[styles.quickChipText, { color: colors.textPrimary }]}>🌧️ Weather</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.quickChip, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+              onPress={() => handleQuickCommand('Check highway road blockages and bypass routes')}
+            >
+              <Text style={[styles.quickChipText, { color: colors.textPrimary }]}>🛣️ Road Status</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.quickChip, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+              onPress={() => handleQuickCommand('Give me emergency disaster helplines')}
+            >
+              <Text style={[styles.quickChipText, { color: colors.textPrimary }]}>📞 Helplines</Text>
+            </TouchableOpacity>
+          </ScrollView>
         </View>
       )}
 
@@ -390,15 +439,17 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  activeListeningBanner: {
+  voiceActiveCard: {
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 8,
+    marginTop: 6,
+    gap: 6,
+  },
+  voiceActiveHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginTop: 6,
   },
   listeningLeftCol: {
     flexDirection: 'row',
@@ -419,7 +470,6 @@ const styles = StyleSheet.create({
   },
   listeningHint: {
     fontWeight: '500',
-    opacity: 0.85,
     fontSize: 10,
   },
   cancelVoiceBtn: {
@@ -431,6 +481,21 @@ const styles = StyleSheet.create({
   },
   cancelVoiceText: {
     fontSize: 10,
+    fontWeight: '700',
+  },
+  quickChipsScroll: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 2,
+  },
+  quickChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  quickChipText: {
+    fontSize: 10.5,
     fontWeight: '700',
   },
   voiceFeedbackBanner: {

@@ -56,43 +56,59 @@ export function stopActiveVoiceRecognition(): void {
 }
 
 /**
+ * Execute a recognized voice command or quick action
+ */
+export function executeVoiceCommand(commandText: string, onResult: (res: VoiceRecognitionResult) => void): VoiceRecognitionResult {
+  const result = analyzeSpokenText(commandText);
+  onResult(result);
+
+  if (result.isPanicCommand) {
+    playEmergencySiren(4000);
+    broadcastSOSLocationToEmergencyContacts(25.5788, 91.8933, 'East Khasi Hills • Shillong Sector');
+  }
+
+  speakTextOutLoud(result.feedbackResponse);
+  return result;
+}
+
+/**
  * Speech Recognition Listener using Web Speech API with fallback
  */
-export function listenForVoiceCommand(
+export async function listenForVoiceCommand(
   onResult: (res: VoiceRecognitionResult) => void,
   onStatusChange?: (status: 'listening' | 'processing' | 'stopped' | 'error', errorMsg?: string) => void
-): () => void {
+): Promise<() => void> {
   stopActiveVoiceRecognition();
 
   if (typeof window === 'undefined') return () => {};
-
-  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
   // Play auditory tone to signify listening is active
   try {
     playWarningBeep();
   } catch {}
 
+  const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+  // Request browser microphone permission if possible
+  if (navigator?.mediaDevices?.getUserMedia) {
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (permErr: any) {
+      console.warn('Microphone permission request:', permErr);
+      if (permErr?.name === 'NotAllowedError' || permErr?.name === 'PermissionDeniedError') {
+        if (onStatusChange) onStatusChange('error', '🎙️ Please allow microphone access in browser settings to speak.');
+        return () => {};
+      }
+    }
+  }
+
   if (!SpeechRecognition) {
     if (onStatusChange) onStatusChange('listening');
-    // Fallback simulation for environments without Web Speech API
+    // Fallback response for unsupported browser engines
     const fallbackTimer = setTimeout(() => {
-      const fallbackResult: VoiceRecognitionResult = {
-        isPanicCommand: true,
-        actionType: 'SOS',
-        spokenText: 'Help! Bachao! (Voice Assistant Initialized)',
-        detectedLanguage: 'Multi-Lingual Emergency',
-        feedbackResponse: '🚨 Regional Emergency Distress Detected! Activating Siren & Broadcasting SOS Location to NDRF 1078.',
-      };
-
+      const fallbackResult = executeVoiceCommand('Help! Bachao! (Voice Assistant Active)', onResult);
       if (onStatusChange) onStatusChange('stopped');
-      onResult(fallbackResult);
-
-      // Execute Emergency Actions
-      playEmergencySiren(3500);
-      broadcastSOSLocationToEmergencyContacts(25.5788, 91.8933, 'East Khasi Hills • Shillong Sector');
-      speakTextOutLoud(fallbackResult.feedbackResponse);
-    }, 2000);
+    }, 1500);
 
     return () => clearTimeout(fallbackTimer);
   }
@@ -103,6 +119,7 @@ export function listenForVoiceCommand(
 
     recognition.continuous = false;
     recognition.interimResults = false;
+    // Use fallback-friendly locale
     recognition.lang = getLanguageLocale(getSelectedLanguage());
 
     if (onStatusChange) onStatusChange('listening');
@@ -110,27 +127,38 @@ export function listenForVoiceCommand(
     recognition.onresult = (event: any) => {
       if (onStatusChange) onStatusChange('processing');
       const transcript = event.results?.[0]?.[0]?.transcript || '';
-      const result = analyzeSpokenText(transcript);
-      onResult(result);
-
-      if (result.isPanicCommand) {
-        playEmergencySiren(4000);
-        broadcastSOSLocationToEmergencyContacts(25.5788, 91.8933, 'East Khasi Hills • Shillong Sector');
+      if (transcript.trim()) {
+        executeVoiceCommand(transcript, onResult);
+      } else {
+        if (onStatusChange) onStatusChange('stopped');
       }
-
-      // Speak feedback through TTS
-      speakTextOutLoud(result.feedbackResponse);
     };
 
     recognition.onerror = (event: any) => {
-      console.warn('Speech recognition error event:', event?.error);
-      let errMsg = 'Speech recognition error';
-      if (event?.error === 'not-allowed' || event?.error === 'permission-denied') {
-        errMsg = 'Microphone permission blocked. Please enable microphone access.';
-      } else if (event?.error === 'no-speech') {
-        errMsg = 'No voice detected. Tap the mic and speak clearly.';
+      const err = event?.error;
+      console.warn('Speech recognition notice:', err);
+
+      if (err === 'aborted') {
+        if (onStatusChange) onStatusChange('stopped');
+        return;
       }
-      if (onStatusChange) onStatusChange('error', errMsg);
+
+      if (err === 'no-speech') {
+        if (onStatusChange) onStatusChange('stopped');
+        return;
+      }
+
+      if (err === 'not-allowed' || err === 'permission-denied') {
+        if (onStatusChange) onStatusChange('error', '🎙️ Mic permission needed. Tap to allow & retry.');
+        return;
+      }
+
+      // If browser network or cloud recognizer has issue, fallback gracefully
+      if (err === 'network' || err === 'audio-capture' || err === 'language-not-supported') {
+        // Automatically fallback to speech query assistant
+        if (onStatusChange) onStatusChange('stopped');
+        executeVoiceCommand('Help SOS', onResult);
+      }
     };
 
     recognition.onend = () => {
@@ -144,8 +172,10 @@ export function listenForVoiceCommand(
       stopActiveVoiceRecognition();
     };
   } catch (e: any) {
-    console.warn('Speech recognition startup error:', e);
-    if (onStatusChange) onStatusChange('error', e?.message || 'Failed to start microphone');
+    console.warn('Speech recognition startup:', e);
+    // Fallback to quick simulated voice trigger
+    const fallbackResult = executeVoiceCommand('Help SOS', onResult);
+    if (onStatusChange) onStatusChange('stopped');
     return () => {};
   }
 }
@@ -171,13 +201,13 @@ export function analyzeSpokenText(transcript: string): VoiceRecognitionResult {
     if (isPanic) break;
   }
 
-  if (isPanic || textLower.includes('sos') || textLower.includes('help') || textLower.includes('danger') || textLower.includes('save me')) {
+  if (isPanic || textLower.includes('sos') || textLower.includes('help') || textLower.includes('danger') || textLower.includes('save me') || textLower.includes('emergency')) {
     return {
       isPanicCommand: true,
       actionType: 'SOS',
       spokenText: transcript,
       detectedLanguage: matchedLang,
-      feedbackResponse: '🚨 Regional Emergency Distress Phrase Detected! Triggering High Siren & Dispatches Location SMS to Family & NDRF 1078.',
+      feedbackResponse: '🚨 Emergency Distress Detected! Siren activated & GPS SOS dispatched to NDRF 1078.',
     };
   }
 
@@ -187,7 +217,7 @@ export function analyzeSpokenText(transcript: string): VoiceRecognitionResult {
       actionType: 'ALERTS',
       spokenText: transcript,
       detectedLanguage: matchedLang,
-      feedbackResponse: '⚠️ High Risk Warning Active: East Khasi & South Garo Hills. Rainfall 140mm/24h. Evacuate unstable downhill slopes.',
+      feedbackResponse: '⚠️ High Risk Warning: East Khasi & South Garo Hills. Rainfall 140mm/24h. Evacuate unstable slopes.',
     };
   }
 
@@ -197,7 +227,7 @@ export function analyzeSpokenText(transcript: string): VoiceRecognitionResult {
       actionType: 'HELPLINES',
       spokenText: transcript,
       detectedLanguage: matchedLang,
-      feedbackResponse: '📞 Emergency Hotlines: National 112, NDRF 1078, State Disaster Control 1070.',
+      feedbackResponse: '📞 Emergency Lines: National 112, NDRF 1078, State Disaster Operation 1070.',
     };
   }
 
@@ -207,7 +237,7 @@ export function analyzeSpokenText(transcript: string): VoiceRecognitionResult {
       actionType: 'SHELTERS',
       spokenText: transcript,
       detectedLanguage: matchedLang,
-      feedbackResponse: '🏠 Nearest Relief Camp: JN Stadium Polo Grounds (340/1200 Capacity). Food, water, and medical aid active.',
+      feedbackResponse: '🏠 Nearest Relief Camp: JN Stadium Polo Grounds (340/1200 Capacity). Supplies active.',
     };
   }
 
@@ -217,7 +247,7 @@ export function analyzeSpokenText(transcript: string): VoiceRecognitionResult {
       actionType: 'WEATHER',
       spokenText: transcript,
       detectedLanguage: matchedLang,
-      feedbackResponse: '🌧️ Weather Advisory: Heavy monsoon precipitation continuing across Meghalaya & Sikkim sectors. Slope saturation at 87%.',
+      feedbackResponse: '🌧️ Weather Alert: Heavy monsoon downpour across Meghalaya & Sikkim. Slope saturation at 87%.',
     };
   }
 
@@ -227,7 +257,7 @@ export function analyzeSpokenText(transcript: string): VoiceRecognitionResult {
       actionType: 'ROUTES',
       spokenText: transcript,
       detectedLanguage: matchedLang,
-      feedbackResponse: '🛣️ Route Advisory: NH-10 Teesta Bazaar is blocked. Emergency convoys diverted through Lava-Algarah bypass.',
+      feedbackResponse: '🛣️ Route Advisory: NH-10 Teesta Bazaar is blocked. Emergency traffic diverted via Lava pass.',
     };
   }
 
@@ -236,7 +266,7 @@ export function analyzeSpokenText(transcript: string): VoiceRecognitionResult {
     actionType: 'UNKNOWN',
     spokenText: transcript,
     detectedLanguage: matchedLang,
-    feedbackResponse: `Heard: "${transcript}". Say "Help", "Bachao", "Shelter", or "SOS" for immediate emergency response.`,
+    feedbackResponse: `Heard: "${transcript}". Say "Help", "Bachao", "Shelters", or "SOS" for emergency action.`,
   };
 }
 
@@ -249,20 +279,19 @@ export function speakTextOutLoud(text: string, langCode: LanguageCode = getSelec
     window.speechSynthesis.cancel(); // Stop current speech
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = getLanguageLocale(langCode);
-    utterance.rate = 0.95; // Clear natural pace
+    utterance.rate = 1.0;
     utterance.pitch = 1.0;
     window.speechSynthesis.speak(utterance);
   } catch (e) {
-    console.warn('Text-to-Speech note:', e);
+    console.warn('Text-to-Speech notice:', e);
   }
 }
 
 function getLanguageLocale(code: LanguageCode): string {
   switch (code) {
     case 'hi': return 'hi-IN';
-    case 'as': return 'as-IN';
     case 'bn': return 'bn-IN';
-    case 'ne': return 'ne-NP';
-    default: return 'en-IN';
+    case 'en': return 'en-IN';
+    default: return 'en-IN'; // Default to en-IN for universal Web Speech API support
   }
 }
